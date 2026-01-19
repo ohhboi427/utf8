@@ -3,14 +3,13 @@ add_library(utf8)
 target_sources(utf8
     PRIVATE
     "src/utf8.cpp"
-    "src/validation.cpp"
-    "src/validation.hpp"
     PUBLIC
     FILE_SET HEADERS
     BASE_DIRS "include"
     FILES
     "include/utf8/error.hpp"
     "include/utf8/utf8.hpp"
+    "include/utf8/detail/validation.hpp"
 )
 
 target_compile_features(utf8

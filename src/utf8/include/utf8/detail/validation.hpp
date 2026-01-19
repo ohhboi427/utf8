@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <string_view>
 
-namespace utf8 {
+namespace utf8::detail {
     constexpr char32_t REPLACEMENT = U'\uFFFD';
 
     constexpr char32_t SURROGATE_FIRST = 0xD800U;
