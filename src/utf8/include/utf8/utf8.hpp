@@ -39,5 +39,5 @@ namespace utf8 {
     };
 
     [[nodiscard]] auto decode(string_view str) noexcept -> std::expected<DecodeResult, Utf8Error>;
-    [[nodiscard]] auto encode(char32_t codepoint) noexcept -> std::array<EncodeResult, 4U>;
+    [[nodiscard]] auto encode(char32_t codepoint) noexcept -> std::expected<EncodeResult, Utf8Error>;
 }
