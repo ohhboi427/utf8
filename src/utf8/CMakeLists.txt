@@ -6,7 +6,8 @@ target_sources(utf8
     PUBLIC
     FILE_SET HEADERS
     BASE_DIRS "include"
-    FILES "include/utf8/utf8.hpp"
+    FILES
+    "include/utf8/utf8.hpp"
 )
 
 target_compile_features(utf8
