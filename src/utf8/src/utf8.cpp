@@ -7,10 +7,12 @@ namespace utf8 {
         constexpr char32_t SURROGATE_FIRST = 0xD800U;
         constexpr char32_t SURROGATE_LAST  = 0xDFFFU;
 
-        constexpr char32_t SEQUENCE1_LAST = U'\u007F';
-        constexpr char32_t SEQUENCE2_LAST = U'\u07FF';
-        constexpr char32_t SEQUENCE3_LAST = U'\uFFFF';
-        constexpr char32_t SEQUENCE4_LAST = U'\U0010FFFF';
+        constexpr std::array SEQUENCE_LAST = {
+            U'\u007F',
+            U'\u07FF',
+            U'\uFFFF',
+            U'\U0010FFFF',
+        };
 
         constexpr char8_t CONTINUATION_UNIT_HEADER = 0x80U;
         constexpr char8_t CONTINUATION_UNIT_MASK   = 0x3FU;
@@ -41,20 +43,10 @@ namespace utf8 {
         }
 
         [[nodiscard]] constexpr auto encoded_length(const char32_t codepoint) noexcept -> std::uint8_t {
-            if(codepoint <= SEQUENCE1_LAST) {
-                return 1U;
-            }
-
-            if(codepoint <= SEQUENCE2_LAST) {
-                return 2U;
-            }
-
-            if(codepoint <= SEQUENCE3_LAST) {
-                return 3U;
-            }
-
-            if(codepoint <= SEQUENCE4_LAST) {
-                return 4U;
+            for(std::uint8_t i = 0U; i < static_cast<std::uint8_t>(SEQUENCE_LAST.size()); ++i) {
+                if(codepoint < SEQUENCE_LAST[i]) {
+                    return i + 1U;
+                }
             }
 
             return 0U;
@@ -85,13 +77,11 @@ namespace utf8 {
             codepoint |= sequence[i] & CONTINUATION_UNIT_MASK;
         }
 
-        if((length == 2U && codepoint <= SEQUENCE1_LAST) ||
-            (length == 3U && codepoint <= SEQUENCE2_LAST) ||
-            (length == 4U && codepoint <= SEQUENCE3_LAST)) {
+        if(codepoint <= SEQUENCE_LAST[length - 2U]) {
             return std::unexpected{ Utf8Error::OverlongEncoding };
         }
 
-        if((codepoint >= SURROGATE_FIRST && codepoint <= SURROGATE_LAST) || codepoint > SEQUENCE4_LAST) {
+        if((codepoint >= SURROGATE_FIRST && codepoint <= SURROGATE_LAST) || codepoint > SEQUENCE_LAST.back()) {
             return std::unexpected{ Utf8Error::InvalidCodepoint };
         }
 
