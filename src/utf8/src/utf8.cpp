@@ -1,116 +1,37 @@
 #include <utf8/utf8.hpp>
 
-#include <bit>
+#include "validation.hpp"
 
 namespace utf8 {
-    namespace {
-        constexpr char32_t SURROGATE_FIRST = 0xD800U;
-        constexpr char32_t SURROGATE_LAST  = 0xDFFFU;
-
-        constexpr std::array SEQUENCE_LAST = {
-            U'\u007F',
-            U'\u07FF',
-            U'\uFFFF',
-            U'\U0010FFFF',
-        };
-
-        constexpr char8_t CONTINUATION_UNIT_HEADER = 0x80U;
-        constexpr char8_t CONTINUATION_UNIT_MASK   = 0x3FU;
-
-        [[nodiscard]] constexpr auto leading_header(const std::uint8_t length) noexcept -> char8_t {
-            return ((1U << length) - 1U) << (8U - length);
-        }
-
-        [[nodiscard]] constexpr auto leading_mask(const std::uint8_t length) noexcept -> char8_t {
-            return (1U << (7U - length)) - 1U;
-        }
-
-        [[nodiscard]] constexpr auto is_continuation(const char8_t unit) noexcept -> bool {
-            return (unit & 0xC0U) == 0x80U;
-        }
-
-        [[nodiscard]] constexpr auto decoded_length(const char8_t unit) noexcept -> std::uint8_t {
-            if((unit & 0x80U) == 0U) {
-                return 1U;
+    auto is_valid(std::u8string_view sequence) noexcept -> bool {
+        while(!sequence.empty()) {
+            const auto decode_result = decode(sequence);
+            if(!decode_result) {
+                return false;
             }
 
-            const std::uint8_t length = std::countl_one(std::bit_cast<std::uint8_t>(unit));
-            if(length < 2U || length > 4U) {
-                return 0U;
-            }
-
-            return length;
+            const auto [codepoint, length] = decode_result.value();
+            sequence.remove_prefix(length);
         }
 
-        [[nodiscard]] constexpr auto encoded_length(const char32_t codepoint) noexcept -> std::uint8_t {
-            for(std::uint8_t i = 0U; i < static_cast<std::uint8_t>(SEQUENCE_LAST.size()); ++i) {
-                if(codepoint < SEQUENCE_LAST[i]) {
-                    return i + 1U;
-                }
-            }
-
-            return 0U;
-        }
+        return true;
     }
 
-    auto decode(const std::u8string_view sequence) noexcept -> std::expected<DecodeResult, Utf8Error> {
-        if(sequence.empty()) {
-            return std::unexpected{ Utf8Error::InvalidByteSequence };
-        }
+    auto length(std::u8string_view sequence) noexcept -> Utf8Expected<std::size_t> {
+        std::size_t result = 0U;
 
-        const auto length = decoded_length(sequence[0U]);
-        if(length == 0U || sequence.size() < length) {
-            return std::unexpected{ Utf8Error::InvalidByteSequence };
-        }
-
-        if(length == 1U) {
-            return DecodeResult{ .codepoint = static_cast<char32_t>(sequence[0U]), .length = length };
-        }
-
-        char32_t codepoint = sequence[0U] & leading_mask(length);
-        for(std::size_t i = 1U; i < length; ++i) {
-            if(!is_continuation(sequence[i])) {
-                return std::unexpected{ Utf8Error::InvalidByteSequence };
+        while(!sequence.empty()) {
+            const auto decode_result = decode(sequence);
+            if(!decode_result) {
+                return std::unexpected{ decode_result.error() };
             }
 
-            codepoint <<= 6U;
-            codepoint |= sequence[i] & CONTINUATION_UNIT_MASK;
+            const auto [codepoint, length] = decode_result.value();
+            sequence.remove_prefix(length);
+
+            ++result;
         }
 
-        if(codepoint <= SEQUENCE_LAST[length - 2U]) {
-            return std::unexpected{ Utf8Error::OverlongEncoding };
-        }
-
-        if((codepoint >= SURROGATE_FIRST && codepoint <= SURROGATE_LAST) || codepoint > SEQUENCE_LAST.back()) {
-            return std::unexpected{ Utf8Error::InvalidCodepoint };
-        }
-
-        return DecodeResult{ .codepoint = codepoint, .length = length };
-    }
-
-    auto encode(char32_t codepoint) noexcept -> std::expected<EncodeResult, Utf8Error> {
-        if(codepoint >= SURROGATE_FIRST && codepoint <= SURROGATE_LAST) {
-            return std::unexpected{ Utf8Error::InvalidCodepoint };
-        }
-
-        const auto length = encoded_length(codepoint);
-        if(length == 0U) {
-            return std::unexpected{ Utf8Error::InvalidCodepoint };
-        }
-
-        if(length == 1U) {
-            return EncodeResult{ .sequence = { static_cast<char8_t>(codepoint), 0U, 0U, 0U }, .length = length };
-        }
-
-        std::array<char8_t, 4U> sequence{};
-        for(std::size_t i = length - 1U; i > 0U; --i) {
-            sequence[i] = CONTINUATION_UNIT_HEADER | (static_cast<char8_t>(codepoint) & CONTINUATION_UNIT_MASK);
-
-            codepoint >>= 6U;
-        }
-
-        sequence[0U] = leading_header(length) | (static_cast<char8_t>(codepoint) & leading_mask(length));
-
-        return EncodeResult{ .sequence = sequence, .length = length };
+        return result;
     }
 }
