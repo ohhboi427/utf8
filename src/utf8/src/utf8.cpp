@@ -53,7 +53,7 @@ namespace utf8 {
         }
     }
 
-    auto decode(const string_view sequence) noexcept -> std::expected<DecodeResult, Utf8Error> {
+    auto decode(const std::u8string_view sequence) noexcept -> std::expected<DecodeResult, Utf8Error> {
         if(sequence.empty()) {
             return std::unexpected{ Utf8Error::InvalidByteSequence };
         }
