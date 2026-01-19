@@ -7,6 +7,8 @@ target_sources(utf8
     FILE_SET HEADERS
     BASE_DIRS "include"
     FILES
+    "include/utf8/error.hpp"
+    "include/utf8/string.hpp"
     "include/utf8/utf8.hpp"
 )
 
