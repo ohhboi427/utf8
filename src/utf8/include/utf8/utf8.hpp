@@ -1,7 +1,7 @@
 #pragma once
 
 #include "error.hpp"
-#include "detail/validation.hpp"
+#include "validation.hpp"
 
 #include <algorithm>
 #include <concepts>
@@ -17,7 +17,7 @@ namespace utf8 {
         requires std::same_as<std::iter_value_t<I>, char8_t>
     [[nodiscard]] constexpr auto is_valid(I it, S end) noexcept -> bool {
         while(it != end) {
-            const auto decode_result = detail::decode(it, end);
+            const auto decode_result = decode(it, end);
             if(!decode_result) {
                 return false;
             }
@@ -42,7 +42,7 @@ namespace utf8 {
         std::size_t result = 0U;
 
         while(it != end) {
-            const auto decode_result = detail::decode(it, end);
+            const auto decode_result = decode(it, end);
             if(!decode_result) {
                 return std::unexpected{ decode_result.error() };
             }
@@ -78,9 +78,9 @@ namespace utf8 {
             : m_it{ std::move(it) }, m_end{ std::move(end) } {}
 
         [[nodiscard]] constexpr auto operator*() const noexcept -> reference {
-            const auto result = detail::decode(m_it, m_end);
+            const auto result = decode(m_it, m_end);
             if(!result) {
-                return detail::REPLACEMENT;
+                return REPLACEMENT;
             }
 
             return result->codepoint;
@@ -117,8 +117,7 @@ namespace utf8 {
                 return;
             }
 
-            const std::uint8_t length = detail::decoded_length(*m_it);
-            const std::uint8_t step   = std::max(length, static_cast<std::uint8_t>(1U));
+            const auto step = decoded_length(*m_it).value_or(1U);
 
             std::ranges::advance(m_it, step, m_end);
         }

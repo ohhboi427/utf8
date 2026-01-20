@@ -9,7 +9,7 @@ target_sources(utf8
     FILES
     "include/utf8/error.hpp"
     "include/utf8/utf8.hpp"
-    "include/utf8/detail/validation.hpp"
+    "include/utf8/validation.hpp"
 )
 
 target_compile_features(utf8
