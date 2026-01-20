@@ -1,4 +1,5 @@
 add_library(utf8)
+add_library(Utf8::Utf8 ALIAS utf8)
 
 target_sources(utf8
     PRIVATE
@@ -16,5 +17,3 @@ target_compile_features(utf8
     PUBLIC
     cxx_std_23
 )
-
-add_library(Utf8::Utf8 ALIAS utf8)

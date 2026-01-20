@@ -137,7 +137,7 @@ namespace utf8 {
         }
 
         DecodeResult result{
-            .codepoint = read_leading(*it++, *length),
+            .codepoint = static_cast<char32_t>(read_leading(*it++, *length)),
             .length    = *length,
         };
 
@@ -148,7 +148,7 @@ namespace utf8 {
             }
 
             result.codepoint <<= 6U;
-            result.codepoint |= *continuation;
+            result.codepoint |= static_cast<char32_t>(*continuation);
 
             ++it;
         }
