@@ -6,42 +6,60 @@
 #include <algorithm>
 #include <concepts>
 #include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <iterator>
 #include <ranges>
-#include <string_view>
 #include <utility>
 
 namespace utf8 {
-    [[nodiscard]] constexpr auto is_valid(std::u8string_view sequence) noexcept -> bool {
-        while(!sequence.empty()) {
-            const auto decode_result = detail::decode(sequence);
+    template<std::input_iterator I, std::sentinel_for<I> S>
+        requires std::same_as<std::iter_value_t<I>, char8_t>
+    [[nodiscard]] constexpr auto is_valid(I it, S end) noexcept -> bool {
+        while(it != end) {
+            const auto decode_result = detail::decode(it, end);
             if(!decode_result) {
                 return false;
             }
 
-            const auto [codepoint, length] = decode_result.value();
-            sequence.remove_prefix(length);
+            const std::uint8_t step = std::max(decode_result->length, static_cast<std::uint8_t>(1U));
+
+            std::ranges::advance(it, step, end);
         }
 
         return true;
     }
 
-    [[nodiscard]] constexpr auto length(std::u8string_view sequence) noexcept -> Utf8Expected<std::size_t> {
+    template<std::ranges::input_range R>
+        requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+    [[nodiscard]] constexpr auto is_valid(R&& range) noexcept -> bool {
+        return is_valid(std::ranges::begin(range), std::ranges::end(range));
+    }
+
+    template<std::input_iterator I, std::sentinel_for<I> S>
+        requires std::same_as<std::iter_value_t<I>, char8_t>
+    [[nodiscard]] constexpr auto length(I it, S end) noexcept -> Utf8Expected<std::size_t> {
         std::size_t result = 0U;
 
-        while(!sequence.empty()) {
-            const auto decode_result = detail::decode(sequence);
+        while(it != end) {
+            const auto decode_result = detail::decode(it, end);
             if(!decode_result) {
                 return std::unexpected{ decode_result.error() };
             }
 
-            const auto [codepoint, length] = decode_result.value();
-            sequence.remove_prefix(length);
+            const std::uint8_t step = std::max(decode_result->length, static_cast<std::uint8_t>(1U));
 
+            std::ranges::advance(it, step, end);
             ++result;
         }
 
         return result;
+    }
+
+    template<std::ranges::input_range R>
+        requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+    [[nodiscard]] constexpr auto length(R&& range) noexcept -> Utf8Expected<std::size_t> {
+        return length(std::ranges::begin(range), std::ranges::end(range));
     }
 
     template<std::forward_iterator I, std::sentinel_for<I> S>
@@ -99,8 +117,8 @@ namespace utf8 {
                 return;
             }
 
-            const auto length = detail::decoded_length(*m_it);
-            const auto step   = std::max(length, static_cast<std::uint8_t>(1U));
+            const std::uint8_t length = detail::decoded_length(*m_it);
+            const std::uint8_t step   = std::max(length, static_cast<std::uint8_t>(1U));
 
             std::ranges::advance(m_it, step, m_end);
         }
