@@ -4,10 +4,12 @@
 #include "detail/validation.hpp"
 
 #include <algorithm>
-#include <compare>
+#include <concepts>
 #include <cstddef>
 #include <iterator>
+#include <ranges>
 #include <string_view>
+#include <utility>
 
 namespace utf8 {
     [[nodiscard]] constexpr auto is_valid(std::u8string_view sequence) noexcept -> bool {
@@ -42,20 +44,23 @@ namespace utf8 {
         return result;
     }
 
+    template<std::forward_iterator I, std::sentinel_for<I> S>
     class Iterator {
     public:
         using iterator_concept  = std::forward_iterator_tag;
         using iterator_category = std::input_iterator_tag;
-        using difference_type   = std::ptrdiff_t;
         using value_type        = char32_t;
-        using pointer           = void;
         using reference         = char32_t;
+        using pointer           = void;
+        using difference_type   = std::iter_difference_t<I>;
 
-        explicit constexpr Iterator(const char8_t* const ptr) noexcept
-            : m_ptr{ ptr } {}
+        Iterator() = default;
+
+        explicit constexpr Iterator(I it, S end) noexcept
+            : m_it{ std::move(it) }, m_end{ std::move(end) } {}
 
         [[nodiscard]] constexpr auto operator*() const noexcept -> reference {
-            const auto result = detail::decode(std::u8string_view{ m_ptr, 4U });
+            const auto result = detail::decode(m_it, m_end);
             if(!result) {
                 return detail::REPLACEMENT;
             }
@@ -78,48 +83,61 @@ namespace utf8 {
         }
 
         [[nodiscard]] friend constexpr auto operator==(const Iterator lhs, const Iterator rhs) noexcept -> bool {
-            return lhs.m_ptr == rhs.m_ptr;
+            return lhs.m_it == rhs.m_it;
         }
 
-        [[nodiscard]] friend constexpr auto operator<=>(
-            const Iterator lhs,
-            const Iterator rhs
-        ) noexcept -> std::strong_ordering {
-            return lhs.m_ptr <=> rhs.m_ptr;
+        [[nodiscard]] friend constexpr auto operator==(const Iterator lhs, std::default_sentinel_t) noexcept -> bool {
+            return lhs.m_it == lhs.m_end;
         }
 
     private:
-        const char8_t* m_ptr{};
+        I m_it{};
+        S m_end{};
 
         auto advance() noexcept -> void {
-            const auto length = detail::decoded_length(*m_ptr);
+            if(m_it == m_end) {
+                return;
+            }
 
-            m_ptr += std::max(length, static_cast<std::uint8_t>(1U));
+            const auto length = detail::decoded_length(*m_it);
+            const auto step   = std::max(length, static_cast<std::uint8_t>(1U));
+
+            std::ranges::advance(m_it, step, m_end);
         }
     };
 
-    class View {
+    template<std::ranges::view V>
+        requires std::same_as<std::ranges::range_value_t<V>, char8_t>
+    class View : public std::ranges::view_interface<View<V>> {
     public:
-        using value_type      = char32_t;
-        using reference       = char32_t;
-        using const_reference = char32_t;
-        using iterator        = Iterator;
-        using const_iterator  = Iterator;
-        using size_type       = std::size_t;
-        using difference_type = std::ptrdiff_t;
+        View() = default;
 
-        explicit constexpr View(const std::u8string_view str) noexcept
-            : m_str{ str } {}
+        explicit constexpr View(V view) noexcept
+            : m_view{ std::move(view) } {}
 
-        [[nodiscard]] constexpr auto begin() const noexcept -> iterator {
-            return iterator{ m_str.data() };
+        [[nodiscard]] constexpr auto begin() const noexcept {
+            return Iterator{ std::ranges::begin(m_view), std::ranges::end(m_view) };
         }
 
-        [[nodiscard]] constexpr auto end() const noexcept -> iterator {
-            return iterator{ m_str.data() + m_str.size() };
+        [[nodiscard]] static constexpr auto end() noexcept {
+            return std::default_sentinel_t{};
         }
 
     private:
-        std::u8string_view m_str{};
+        V m_view{};
     };
+
+    template<std::ranges::viewable_range R>
+        requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+    View(R&&) -> View<std::views::all_t<R>>;
+
+    struct AsUtf8Fn : std::ranges::range_adaptor_closure<AsUtf8Fn> {
+        template<std::ranges::viewable_range R>
+            requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+        [[nodiscard]] static constexpr auto operator()(R&& range) noexcept {
+            return View{ std::forward<R>(range) };
+        }
+    };
+
+    inline constexpr AsUtf8Fn as_utf8{};
 }

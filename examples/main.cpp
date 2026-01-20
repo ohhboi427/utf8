@@ -13,7 +13,7 @@ auto main() -> int {
         std::println("{}", length.value());
     }
 
-    for(const auto codepoint : utf8::View{ str }) {
+    for(const auto codepoint : str | utf8::as_utf8) {
         std::println("U+{:04X}", std::bit_cast<std::uint32_t>(codepoint));
     }
 }

@@ -5,6 +5,7 @@
 #include <array>
 #include <bit>
 #include <cstdint>
+#include <ranges>
 #include <string_view>
 
 namespace utf8::detail {
@@ -68,28 +69,32 @@ namespace utf8::detail {
         std::uint8_t            length;
     };
 
-    [[nodiscard]] constexpr auto decode(std::u8string_view sequence) noexcept -> Utf8Expected<DecodeResult> {
-        if(sequence.empty()) {
+    template<std::input_iterator I, std::sentinel_for<I> S>
+        requires std::same_as<std::iter_value_t<I>, char8_t>
+    [[nodiscard]] constexpr auto decode(I it, S end) noexcept -> Utf8Expected<DecodeResult> {
+        if(it == end) {
             return std::unexpected{ Utf8Error::InvalidByteSequence };
         }
 
-        const auto length = decoded_length(sequence[0U]);
-        if(length == 0U || sequence.size() < length) {
+        const auto length = decoded_length(*it);
+        if(length == 0U || std::ranges::distance(it, end) < length) {
             return std::unexpected{ Utf8Error::InvalidByteSequence };
         }
 
         if(length == 1U) {
-            return DecodeResult{ .codepoint = static_cast<char32_t>(sequence[0U]), .length = length };
+            return DecodeResult{ .codepoint = static_cast<char32_t>(*it), .length = length };
         }
 
-        char32_t codepoint = sequence[0U] & leading_mask(length);
+        char32_t codepoint = *it++ & leading_mask(length);
         for(std::size_t i = 1U; i < length; ++i) {
-            if(!is_continuation(sequence[i])) {
+            if(!is_continuation(*it)) {
                 return std::unexpected{ Utf8Error::InvalidByteSequence };
             }
 
             codepoint <<= 6U;
-            codepoint |= sequence[i] & CONTINUATION_UNIT_MASK;
+            codepoint |= *it & CONTINUATION_UNIT_MASK;
+
+            ++it;
         }
 
         if(codepoint <= SEQUENCE_LAST[length - 2U]) {
@@ -101,6 +106,12 @@ namespace utf8::detail {
         }
 
         return DecodeResult{ .codepoint = codepoint, .length = length };
+    }
+
+    template<std::ranges::input_range R>
+        requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+    [[nodiscard]] constexpr auto decode(R&& range) noexcept -> Utf8Expected<DecodeResult> {
+        return decode(std::ranges::begin(range), std::ranges::end(range));
     }
 
     [[nodiscard]] constexpr auto encode(char32_t codepoint) noexcept -> Utf8Expected<EncodeResult> {
