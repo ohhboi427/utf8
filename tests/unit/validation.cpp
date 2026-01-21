@@ -227,3 +227,11 @@ TEST(Utf8EncodingTests, decode_error) {
     test_case(std::initializer_list<char8_t>{ 0xEDU, 0xA0U, 0x80U }, Error::InvalidCodepoint, 3U);
     test_case(std::initializer_list<char8_t>{ 0xF4U, 0x90U, 0x80U, 0x80U }, Error::InvalidCodepoint, 4U);
 }
+
+TEST(Utf8EncodingTests, encode_success) {
+    // TODO: After finally reworked make test
+}
+
+TEST(Utf8EncodingTests, encode_error) {
+    // TODO: After finally reworked make test
+}
