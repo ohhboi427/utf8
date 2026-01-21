@@ -3,14 +3,14 @@ add_library(Utf8::Utf8 ALIAS utf8)
 
 target_sources(utf8
     PRIVATE
-    "src/utf8.cpp"
+    "utf8.cpp"
     PUBLIC
     FILE_SET HEADERS
-    BASE_DIRS "include"
+    BASE_DIRS "../include"
     FILES
-    "include/utf8/utf8.hpp"
-    "include/utf8/error.hpp"
-    "include/utf8/validation.hpp"
+    "../include/utf8/utf8.hpp"
+    "../include/utf8/error.hpp"
+    "../include/utf8/validation.hpp"
 )
 
 target_compile_features(utf8

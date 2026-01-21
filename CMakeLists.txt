@@ -10,5 +10,5 @@ endif()
 
 include(FetchContent)
 
-add_subdirectory("src/utf8")
+add_subdirectory("src")
 add_subdirectory("examples")
