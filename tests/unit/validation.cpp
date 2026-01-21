@@ -165,3 +165,65 @@ TEST(Utf8CodepointTests, surrogate) {
     ASSERT_TRUE(is_invalid(0xD800U));
     ASSERT_TRUE(is_invalid(0xDFFFU));
 }
+
+TEST(Utf8EncodingTests, decode_success) {
+    static constexpr auto test_case = [](
+        std::ranges::input_range auto&& range,
+        const char32_t                  expected_codepoint,
+        const std::ptrdiff_t            expected_distance
+    ) noexcept -> void {
+        const auto begin = std::ranges::begin(range);
+        const auto end   = std::ranges::end(range);
+
+        const auto [it, codepoint] = decode(begin, end);
+        EXPECT_EQ(std::distance(begin, it), expected_distance);
+
+        ASSERT_TRUE(codepoint.has_value());
+        EXPECT_EQ(*codepoint, expected_codepoint);
+    };
+
+    test_case(std::initializer_list<char8_t>{ 0x7FU }, 0x007FU, 1U);
+    test_case(std::initializer_list<char8_t>{ 0xDFU, 0xBFU }, 0x07FFU, 2U);
+    test_case(std::initializer_list<char8_t>{ 0xEFU, 0xBFU, 0xBFU }, 0xFFFFU, 3U);
+    test_case(std::initializer_list<char8_t>{ 0xF4U, 0x8FU, 0xBFU, 0xBFU }, 0x10FFFFU, 4U);
+}
+
+TEST(Utf8EncodingTests, decode_error) {
+    static constexpr auto test_case = [](
+        std::ranges::input_range auto&& range,
+        const Error                     error,
+        const std::ptrdiff_t            expected_distance
+    ) noexcept -> void {
+        const auto begin = std::ranges::begin(range);
+        const auto end   = std::ranges::end(range);
+
+        const auto [it, codepoint] = decode(begin, end);
+        EXPECT_EQ(std::distance(begin, it), expected_distance);
+
+        ASSERT_FALSE(codepoint.has_value());
+        EXPECT_EQ(codepoint.error(), error);
+    };
+
+    // Invalid leading
+    test_case(std::initializer_list<char8_t>{ 0xFFU }, Error::InvalidByteSequence, 1U);
+    test_case(std::initializer_list<char8_t>{ 0xF8U }, Error::InvalidByteSequence, 1U);
+    test_case(std::initializer_list<char8_t>{ 0x80U }, Error::InvalidByteSequence, 1U);
+
+    // Too short
+    test_case(std::initializer_list<char8_t>{ 0xC2U }, Error::InvalidByteSequence, 1U);
+    test_case(std::initializer_list<char8_t>{ 0xE2U, 0x80U }, Error::InvalidByteSequence, 2U);
+    test_case(std::initializer_list<char8_t>{ 0xF0U, 0x80U, 0x80U }, Error::InvalidByteSequence, 3U);
+
+    // Invalid continuation
+    test_case(std::initializer_list<char8_t>{ 0xC2U, 0x00U }, Error::InvalidByteSequence, 1U);
+    test_case(std::initializer_list<char8_t>{ 0xE2U, 0x00U }, Error::InvalidByteSequence, 1U);
+    test_case(std::initializer_list<char8_t>{ 0xF0U, 0x00U }, Error::InvalidByteSequence, 1U);
+
+    // Overlong
+    test_case(std::initializer_list<char8_t>{ 0xC0U, 0xAFU }, Error::OverlongEncoding, 2U);
+    test_case(std::initializer_list<char8_t>{ 0xF0U, 0x82U, 0x82U, 0xACU }, Error::OverlongEncoding, 4U);
+
+    // Invalid codepoints
+    test_case(std::initializer_list<char8_t>{ 0xEDU, 0xA0U, 0x80U }, Error::InvalidCodepoint, 3U);
+    test_case(std::initializer_list<char8_t>{ 0xF4U, 0x90U, 0x80U, 0x80U }, Error::InvalidCodepoint, 4U);
+}
