@@ -60,8 +60,15 @@ namespace utf8 {
         return detail::leading_header(length) | unit & detail::leading_mask(length);
     }
 
-    [[nodiscard]] constexpr auto read_leading(const char8_t unit, const std::uint8_t length) noexcept -> char8_t {
-        return unit & detail::leading_mask(length);
+    [[nodiscard]] constexpr auto read_leading(
+        const char8_t unit
+    ) noexcept -> Expected<std::pair<char8_t, std::uint8_t>> {
+        const auto length = decoded_length(unit);
+        if(!length) {
+            return std::unexpected{ length.error() };
+        }
+
+        return std::make_pair(unit & detail::leading_mask(*length), *length);
     }
 
     [[nodiscard]] constexpr auto is_continuation(const char8_t unit) noexcept -> bool {
@@ -74,7 +81,7 @@ namespace utf8 {
 
     [[nodiscard]] constexpr auto read_continuation(const char8_t unit) noexcept -> Expected<char8_t> {
         if(!is_continuation(unit)) {
-            return std::unexpected{ Error::InvalidCodepoint };
+            return std::unexpected{ Error::InvalidByteSequence };
         }
 
         return unit & detail::CONTINUATION_UNIT_MASK;
@@ -103,7 +110,7 @@ namespace utf8 {
         }
 
         for(std::uint8_t i = 0U; i < static_cast<std::uint8_t>(detail::SEQUENCE_LAST.size()); ++i) {
-            if(codepoint < detail::SEQUENCE_LAST[i]) {
+            if(codepoint <= detail::SEQUENCE_LAST[i]) {
                 return i + 1U;
             }
         }
@@ -123,18 +130,17 @@ namespace utf8 {
             return { std::move(it), std::unexpected{ Error::InvalidByteSequence } };
         }
 
-        const char8_t leading = *it;
-        const auto    length  = decoded_length(leading);
-        if(!length) {
-            std::ranges::advance(it, 1U, end);
-
-            return { std::move(it), std::unexpected{ length.error() } };
-        }
-
-        auto codepoint = static_cast<char32_t>(read_leading(leading, *length));
+        const auto leading_length = read_leading(*it);
         std::ranges::advance(it, 1U, end);
 
-        for(std::size_t i = 1U; i < *length; ++i) {
+        if(!leading_length) {
+            return { std::move(it), std::unexpected{ leading_length.error() } };
+        }
+
+        const auto [leading, length] = *leading_length;
+
+        auto codepoint = static_cast<char32_t>(leading);
+        for(std::size_t i = 1U; i < length; ++i) {
             if(it == end) {
                 return { std::move(it), std::unexpected{ Error::InvalidByteSequence } };
             }
@@ -150,7 +156,7 @@ namespace utf8 {
             std::ranges::advance(it, 1U, end);
         }
 
-        if(is_overlong(codepoint, *length)) {
+        if(is_overlong(codepoint, length)) {
             return { std::move(it), std::unexpected{ Error::OverlongEncoding } };
         }
 

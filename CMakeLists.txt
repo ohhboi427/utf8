@@ -12,3 +12,10 @@ include(FetchContent)
 
 add_subdirectory("src")
 add_subdirectory("examples")
+
+option(UTF8_BUILD_TESTS "Build tests" ON)
+
+if(UTF8_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory("tests")
+endif()
