@@ -10,6 +10,7 @@
 #include <expected>
 #include <iterator>
 #include <ranges>
+#include <utility>
 
 namespace utf8 {
     constexpr char32_t REPLACEMENT = U'\uFFFD';
@@ -110,11 +111,6 @@ namespace utf8 {
         return std::unexpected{ Error::InvalidCodepoint };
     }
 
-    struct DecodeResult {
-        char32_t     codepoint;
-        std::uint8_t length;
-    };
-
     struct EncodeResult {
         std::array<char8_t, 4U> sequence;
         std::uint8_t            length;
@@ -122,52 +118,47 @@ namespace utf8 {
 
     template<std::input_iterator I, std::sentinel_for<I> S>
         requires std::same_as<std::iter_value_t<I>, char8_t>
-    [[nodiscard]] constexpr auto decode(I it, S end) noexcept -> Expected<DecodeResult> {
+    [[nodiscard]] constexpr auto decode(I it, S end) noexcept -> std::pair<I, Expected<char32_t>> {
         if(it == end) {
-            return std::unexpected{ Error::InvalidByteSequence };
+            return { std::move(it), std::unexpected{ Error::InvalidByteSequence } };
         }
 
-        const auto length = decoded_length(*it);
+        const char8_t leading = *it;
+        const auto    length  = decoded_length(leading);
         if(!length) {
-            return std::unexpected{ length.error() };
+            std::ranges::advance(it, 1U, end);
+
+            return { std::move(it), std::unexpected{ length.error() } };
         }
 
-        if(std::ranges::distance(it, end) < *length) {
-            return std::unexpected{ Error::InvalidByteSequence };
-        }
+        auto codepoint = static_cast<char32_t>(read_leading(leading, *length));
+        std::ranges::advance(it, 1U, end);
 
-        DecodeResult result{
-            .codepoint = static_cast<char32_t>(read_leading(*it++, *length)),
-            .length    = *length,
-        };
-
-        for(std::size_t i = 1U; i < result.length; ++i) {
-            const auto continuation = read_continuation(*it);
-            if(!continuation) {
-                return std::unexpected{ continuation.error() };
+        for(std::size_t i = 1U; i < *length; ++i) {
+            if(it == end) {
+                return { std::move(it), std::unexpected{ Error::InvalidByteSequence } };
             }
 
-            result.codepoint <<= 6U;
-            result.codepoint |= static_cast<char32_t>(*continuation);
+            const auto continuation = read_continuation(*it);
+            if(!continuation) {
+                return { std::move(it), std::unexpected{ continuation.error() } };
+            }
 
-            ++it;
+            codepoint <<= 6U;
+            codepoint |= static_cast<char32_t>(*continuation);
+
+            std::ranges::advance(it, 1U, end);
         }
 
-        if(is_overlong(result.codepoint, result.length)) {
-            return std::unexpected{ Error::OverlongEncoding };
+        if(is_overlong(codepoint, *length)) {
+            return { std::move(it), std::unexpected{ Error::OverlongEncoding } };
         }
 
-        if(is_invalid(result.codepoint)) {
-            return std::unexpected{ Error::InvalidCodepoint };
+        if(is_invalid(codepoint)) {
+            return { std::move(it), std::unexpected{ Error::InvalidCodepoint } };
         }
 
-        return result;
-    }
-
-    template<std::ranges::input_range R>
-        requires std::same_as<std::ranges::range_value_t<R>, char8_t>
-    [[nodiscard]] constexpr auto decode(R&& range) noexcept -> Expected<DecodeResult> {
-        return decode(std::ranges::begin(range), std::ranges::end(range));
+        return std::make_pair(std::move(it), codepoint);
     }
 
     [[nodiscard]] constexpr auto encode(char32_t codepoint) noexcept -> Expected<EncodeResult> {

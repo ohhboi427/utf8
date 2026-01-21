@@ -3,13 +3,12 @@
 #include "error.hpp"
 #include "validation.hpp"
 
-#include <algorithm>
 #include <concepts>
 #include <cstddef>
-#include <cstdint>
 #include <expected>
 #include <iterator>
 #include <ranges>
+#include <type_traits>
 #include <utility>
 
 namespace utf8 {
@@ -17,14 +16,12 @@ namespace utf8 {
         requires std::same_as<std::iter_value_t<I>, char8_t>
     [[nodiscard]] constexpr auto is_valid(I it, S end) noexcept -> bool {
         while(it != end) {
-            const auto decode_result = decode(it, end);
-            if(!decode_result) {
+            auto [new_it, codepoint] = decode(std::move(it), end);
+            if(!codepoint) {
                 return false;
             }
 
-            const std::uint8_t step = std::max(decode_result->length, static_cast<std::uint8_t>(1U));
-
-            std::ranges::advance(it, step, end);
+            it = std::move(new_it);
         }
 
         return true;
@@ -42,14 +39,13 @@ namespace utf8 {
         std::size_t result = 0U;
 
         while(it != end) {
-            const auto decode_result = decode(it, end);
-            if(!decode_result) {
-                return std::unexpected{ decode_result.error() };
+            auto [new_it, codepoint] = decode(std::move(it), end);
+            if(!codepoint) {
+                return std::unexpected{ codepoint.error() };
             }
 
-            const std::uint8_t step = std::max(decode_result->length, static_cast<std::uint8_t>(1U));
+            it = std::move(new_it);
 
-            std::ranges::advance(it, step, end);
             ++result;
         }
 
@@ -62,64 +58,92 @@ namespace utf8 {
         return length(std::ranges::begin(range), std::ranges::end(range));
     }
 
-    template<std::forward_iterator I, std::sentinel_for<I> S>
+    template<std::input_iterator I, std::sentinel_for<I> S>
     class Iterator {
+        static constexpr char32_t END_OF_STREAM = 0xFFFFFFFFU;
+
     public:
-        using iterator_concept  = std::forward_iterator_tag;
         using iterator_category = std::input_iterator_tag;
-        using value_type        = char32_t;
-        using reference         = char32_t;
-        using pointer           = void;
-        using difference_type   = std::iter_difference_t<I>;
+        using iterator_concept  = std::conditional_t<
+            std::forward_iterator<I>,
+            std::forward_iterator_tag,
+            std::input_iterator_tag
+        >;
+
+        using value_type      = char32_t;
+        using reference       = char32_t;
+        using pointer         = void;
+        using difference_type = std::iter_difference_t<I>;
 
         Iterator() = default;
 
         explicit constexpr Iterator(I it, S end) noexcept
-            : m_it{ std::move(it) }, m_end{ std::move(end) } {}
+            : m_it{ std::move(it) }, m_end{ std::move(end) } {
+            next();
+        }
 
         [[nodiscard]] constexpr auto operator*() const noexcept -> reference {
-            const auto result = decode(m_it, m_end);
-            if(!result) {
-                return REPLACEMENT;
-            }
-
-            return result->codepoint;
+            return m_codepoint;
         }
 
         constexpr auto operator++() noexcept -> Iterator& {
-            advance();
+            next();
 
             return *this;
         }
 
-        constexpr auto operator++(int) noexcept -> Iterator {
-            const auto copy = *this;
+        constexpr auto operator++(int) noexcept {
+            if constexpr(std::forward_iterator<I>) {
+                const auto copy = *this;
 
-            advance();
+                next();
 
-            return copy;
+                return copy;
+            } else {
+                class Proxy {
+                public:
+                    explicit constexpr Proxy(const value_type codepoint) noexcept
+                        : m_codepoint{ codepoint } {}
+
+                    [[nodiscard]] constexpr auto operator*() const noexcept -> reference {
+                        return m_codepoint;
+                    }
+
+                private:
+                    value_type m_codepoint;
+                };
+
+                const Proxy proxy{ m_codepoint };
+
+                next();
+
+                return proxy;
+            }
         }
 
         [[nodiscard]] friend constexpr auto operator==(const Iterator lhs, const Iterator rhs) noexcept -> bool {
-            return lhs.m_it == rhs.m_it;
+            return lhs.m_it == rhs.m_it && lhs.m_codepoint == rhs.m_codepoint;
         }
 
         [[nodiscard]] friend constexpr auto operator==(const Iterator lhs, std::default_sentinel_t) noexcept -> bool {
-            return lhs.m_it == lhs.m_end;
+            return lhs.m_codepoint == END_OF_STREAM;
         }
 
     private:
-        I m_it{};
-        S m_end{};
+        I          m_it{};
+        S          m_end{};
+        value_type m_codepoint{};
 
-        auto advance() noexcept -> void {
+        auto next() noexcept -> void {
             if(m_it == m_end) {
+                m_codepoint = END_OF_STREAM;
                 return;
             }
 
-            const auto step = decoded_length(*m_it).value_or(1U);
+            auto [it, codepoint] = decode(std::move(m_it), m_end);
 
-            std::ranges::advance(m_it, step, m_end);
+            m_it        = std::move(it);
+            m_codepoint = codepoint.value_or(REPLACEMENT);
         }
     };
 
@@ -132,8 +156,8 @@ namespace utf8 {
         explicit constexpr View(V view) noexcept
             : m_view{ std::move(view) } {}
 
-        [[nodiscard]] constexpr auto begin() const noexcept {
-            return Iterator{ std::ranges::begin(m_view), std::ranges::end(m_view) };
+        [[nodiscard]] constexpr auto begin(this auto&& self) noexcept {
+            return Iterator{ std::ranges::begin(self.m_view), std::ranges::end(self.m_view) };
         }
 
         [[nodiscard]] static constexpr auto end() noexcept {
