@@ -42,14 +42,14 @@ namespace utf8 {
         }
     }
 
-    [[nodiscard]] constexpr auto decoded_length(const char8_t unit) noexcept -> Utf8Expected<std::uint8_t> {
+    [[nodiscard]] constexpr auto decoded_length(const char8_t unit) noexcept -> Expected<std::uint8_t> {
         if((unit & 0x80U) == 0U) {
             return 1U;
         }
 
         const std::uint8_t length = std::countl_one(std::bit_cast<std::uint8_t>(unit));
         if(length < 2U || length > 4U) {
-            return std::unexpected{ Utf8Error::InvalidByteSequence };
+            return std::unexpected{ Error::InvalidByteSequence };
         }
 
         return length;
@@ -71,9 +71,9 @@ namespace utf8 {
         return detail::CONTINUATION_UNIT_HEADER | unit & detail::CONTINUATION_UNIT_MASK;
     }
 
-    [[nodiscard]] constexpr auto read_continuation(const char8_t unit) noexcept -> Utf8Expected<char8_t> {
+    [[nodiscard]] constexpr auto read_continuation(const char8_t unit) noexcept -> Expected<char8_t> {
         if(!is_continuation(unit)) {
-            return std::unexpected{ Utf8Error::InvalidCodepoint };
+            return std::unexpected{ Error::InvalidCodepoint };
         }
 
         return unit & detail::CONTINUATION_UNIT_MASK;
@@ -96,9 +96,9 @@ namespace utf8 {
             codepoint > detail::SEQUENCE_LAST.back();
     }
 
-    [[nodiscard]] constexpr auto encoded_length(const char32_t codepoint) noexcept -> Utf8Expected<std::uint8_t> {
+    [[nodiscard]] constexpr auto encoded_length(const char32_t codepoint) noexcept -> Expected<std::uint8_t> {
         if(is_invalid(codepoint)) {
-            return std::unexpected{ Utf8Error::InvalidCodepoint };
+            return std::unexpected{ Error::InvalidCodepoint };
         }
 
         for(std::uint8_t i = 0U; i < static_cast<std::uint8_t>(detail::SEQUENCE_LAST.size()); ++i) {
@@ -107,7 +107,7 @@ namespace utf8 {
             }
         }
 
-        return std::unexpected{ Utf8Error::InvalidCodepoint };
+        return std::unexpected{ Error::InvalidCodepoint };
     }
 
     struct DecodeResult {
@@ -122,9 +122,9 @@ namespace utf8 {
 
     template<std::input_iterator I, std::sentinel_for<I> S>
         requires std::same_as<std::iter_value_t<I>, char8_t>
-    [[nodiscard]] constexpr auto decode(I it, S end) noexcept -> Utf8Expected<DecodeResult> {
+    [[nodiscard]] constexpr auto decode(I it, S end) noexcept -> Expected<DecodeResult> {
         if(it == end) {
-            return std::unexpected{ Utf8Error::InvalidByteSequence };
+            return std::unexpected{ Error::InvalidByteSequence };
         }
 
         const auto length = decoded_length(*it);
@@ -133,7 +133,7 @@ namespace utf8 {
         }
 
         if(std::ranges::distance(it, end) < *length) {
-            return std::unexpected{ Utf8Error::InvalidByteSequence };
+            return std::unexpected{ Error::InvalidByteSequence };
         }
 
         DecodeResult result{
@@ -154,11 +154,11 @@ namespace utf8 {
         }
 
         if(is_overlong(result.codepoint, result.length)) {
-            return std::unexpected{ Utf8Error::OverlongEncoding };
+            return std::unexpected{ Error::OverlongEncoding };
         }
 
         if(is_invalid(result.codepoint)) {
-            return std::unexpected{ Utf8Error::InvalidCodepoint };
+            return std::unexpected{ Error::InvalidCodepoint };
         }
 
         return result;
@@ -166,13 +166,13 @@ namespace utf8 {
 
     template<std::ranges::input_range R>
         requires std::same_as<std::ranges::range_value_t<R>, char8_t>
-    [[nodiscard]] constexpr auto decode(R&& range) noexcept -> Utf8Expected<DecodeResult> {
+    [[nodiscard]] constexpr auto decode(R&& range) noexcept -> Expected<DecodeResult> {
         return decode(std::ranges::begin(range), std::ranges::end(range));
     }
 
-    [[nodiscard]] constexpr auto encode(char32_t codepoint) noexcept -> Utf8Expected<EncodeResult> {
+    [[nodiscard]] constexpr auto encode(char32_t codepoint) noexcept -> Expected<EncodeResult> {
         if(is_invalid(codepoint)) {
-            return std::unexpected{ Utf8Error::InvalidCodepoint };
+            return std::unexpected{ Error::InvalidCodepoint };
         }
 
         const auto length = encoded_length(codepoint);

@@ -38,7 +38,7 @@ namespace utf8 {
 
     template<std::input_iterator I, std::sentinel_for<I> S>
         requires std::same_as<std::iter_value_t<I>, char8_t>
-    [[nodiscard]] constexpr auto length(I it, S end) noexcept -> Utf8Expected<std::size_t> {
+    [[nodiscard]] constexpr auto length(I it, S end) noexcept -> Expected<std::size_t> {
         std::size_t result = 0U;
 
         while(it != end) {
@@ -58,7 +58,7 @@ namespace utf8 {
 
     template<std::ranges::input_range R>
         requires std::same_as<std::ranges::range_value_t<R>, char8_t>
-    [[nodiscard]] constexpr auto length(R&& range) noexcept -> Utf8Expected<std::size_t> {
+    [[nodiscard]] constexpr auto length(R&& range) noexcept -> Expected<std::size_t> {
         return length(std::ranges::begin(range), std::ranges::end(range));
     }
 
