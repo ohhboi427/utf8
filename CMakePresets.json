@@ -21,6 +21,14 @@
         "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "lib",
         "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "lib"
       }
+    },
+    {
+      "name": "ci-config",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     }
   ],
   "buildPresets": [
@@ -35,6 +43,10 @@
       "displayName": "Release",
       "configurePreset": "base",
       "configuration": "Release"
+    },
+    {
+      "name": "ci-build",
+      "configurePreset": "ci-config"
     }
   ],
   "testPresets": [
@@ -50,6 +62,36 @@
         "noTestsAction": "error",
         "stopOnFailure": false
       }
+    },
+    {
+      "name": "ci-test",
+      "configurePreset": "ci-config",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "ci",
+      "displayName": "CI Workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "ci-config"
+        },
+        {
+          "type": "build",
+          "name": "ci-build"
+        },
+        {
+          "type": "test",
+          "name": "ci-test"
+        }
+      ]
     }
   ]
 }
