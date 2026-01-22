@@ -118,14 +118,11 @@ namespace utf8 {
         return std::unexpected{ Error::InvalidCodepoint };
     }
 
-    struct EncodeResult {
-        std::array<char8_t, 4U> sequence;
-        std::uint8_t            length;
-    };
+    using Decode = char32_t;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
         requires std::same_as<std::iter_value_t<I>, char8_t>
-    [[nodiscard]] constexpr auto decode(I it, S end) noexcept -> std::pair<I, Expected<char32_t>> {
+    [[nodiscard]] constexpr auto decode(I it, S end) noexcept -> std::pair<I, Expected<Decode>> {
         if(it == end) {
             return { std::move(it), std::unexpected{ Error::InvalidByteSequence } };
         }
@@ -164,27 +161,47 @@ namespace utf8 {
             return { std::move(it), std::unexpected{ Error::InvalidCodepoint } };
         }
 
-        return std::make_pair(std::move(it), codepoint);
+        return { std::move(it), codepoint };
     }
 
-    [[nodiscard]] constexpr auto encode(char32_t codepoint) noexcept -> Expected<EncodeResult> {
-        if(is_invalid(codepoint)) {
-            return std::unexpected{ Error::InvalidCodepoint };
+    struct Encode {
+        std::array<char8_t, 4U> units;
+        std::uint8_t            length;
+
+        [[nodiscard]] constexpr auto size() const noexcept -> std::size_t {
+            return length;
         }
 
+        [[nodiscard]] constexpr auto begin(this auto&& self) noexcept {
+            return self.units.begin();
+        }
+
+        [[nodiscard]] constexpr auto end(this auto&& self) noexcept {
+            return self.units.begin() + self.length;
+        }
+    };
+
+    [[nodiscard]] constexpr auto encode(char32_t codepoint) noexcept -> Expected<Encode> {
         const auto length = encoded_length(codepoint);
         if(!length) {
             return std::unexpected{ length.error() };
         }
 
-        EncodeResult result{ .sequence = {}, .length = *length };
+        Encode result{ .units = {}, .length = *length };
+
+        if(result.length == 1U) {
+            result.units[0U] = static_cast<char8_t>(codepoint);
+
+            return result;
+        }
+
         for(std::size_t i = result.length - 1U; i > 0U; --i) {
-            result.sequence[i] = make_continuation(static_cast<char8_t>(codepoint));
+            result.units[i] = make_continuation(static_cast<char8_t>(codepoint));
 
             codepoint >>= 6U;
         }
 
-        result.sequence[0U] = make_leading(static_cast<char8_t>(codepoint), result.length);
+        result.units[0U] = make_leading(static_cast<char8_t>(codepoint), result.length);
 
         return result;
     }

@@ -229,9 +229,43 @@ TEST(Utf8EncodingTests, decode_error) {
 }
 
 TEST(Utf8EncodingTests, encode_success) {
-    // TODO: After finally reworked make test
+    static constexpr auto test_case = [](
+        const char32_t                  codepoint,
+        std::ranges::input_range auto&& expected_units
+    ) noexcept -> void {
+        const auto units = encode(codepoint);
+        ASSERT_TRUE(units.has_value());
+
+        auto       it  = units->begin();
+        const auto end = units->end();
+
+        for(const auto expected_unit : expected_units) {
+            ASSERT_NE(it, end);
+            EXPECT_EQ(*it, expected_unit);
+
+            ++it;
+        }
+
+        for(; it < end; ++it) {
+            EXPECT_EQ(*it, 0U);
+        }
+    };
+
+    test_case(0x007FU, std::initializer_list<char8_t>{ 0x7FU });
+    test_case(0x07FFU, std::initializer_list<char8_t>{ 0xDFU, 0xBFU });
+    test_case(0xFFFFU, std::initializer_list<char8_t>{ 0xEFU, 0xBFU, 0xBFU });
+    test_case(0x10FFFFU, std::initializer_list<char8_t>{ 0xF4U, 0x8FU, 0xBFU, 0xBFU });
 }
 
 TEST(Utf8EncodingTests, encode_error) {
-    // TODO: After finally reworked make test
+    static constexpr auto test_case = [](const char32_t codepoint) noexcept -> void {
+        const auto units = encode(codepoint);
+        ASSERT_FALSE(units.has_value());
+
+        EXPECT_EQ(units.error(), Error::InvalidCodepoint);
+    };
+
+    test_case(0xD800U);
+    test_case(0xDFFFU);
+    test_case(0xFFFFFFFFU);
 }
