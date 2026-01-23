@@ -3,6 +3,7 @@
 #include "error.hpp"
 #include "validation.hpp"
 
+#include <algorithm>
 #include <concepts>
 #include <cstddef>
 #include <expected>
