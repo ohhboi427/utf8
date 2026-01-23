@@ -11,3 +11,6 @@ cache/
 
 # CLion
 .idea/
+
+.cache/
+compile_commands.json
