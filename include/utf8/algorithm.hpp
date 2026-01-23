@@ -26,12 +26,6 @@ namespace utf8 {
         return true;
     }
 
-    template<std::ranges::input_range R>
-        requires std::same_as<std::ranges::range_value_t<R>, char8_t>
-    [[nodiscard]] constexpr auto is_valid(R&& range) noexcept -> bool {
-        return is_valid(std::ranges::begin(range), std::ranges::end(range));
-    }
-
     template<std::input_iterator I, std::sentinel_for<I> S>
         requires std::same_as<std::iter_value_t<I>, char8_t>
     [[nodiscard]] constexpr auto length(I it, S end) noexcept -> Expected<std::size_t> {
@@ -51,12 +45,6 @@ namespace utf8 {
         return result;
     }
 
-    template<std::ranges::input_range R>
-        requires std::same_as<std::ranges::range_value_t<R>, char8_t>
-    [[nodiscard]] constexpr auto length(R&& range) noexcept -> Expected<std::size_t> {
-        return length(std::ranges::begin(range), std::ranges::end(range));
-    }
-
     template<std::input_iterator I, std::sentinel_for<I> S, std::output_iterator<char8_t> O>
         requires std::same_as<std::iter_value_t<I>, char8_t>
     constexpr auto repair(I it, S end, O out) noexcept -> O {
@@ -64,7 +52,7 @@ namespace utf8 {
             auto [new_it, codepoint] = decode(std::move(it), end);
 
             const auto [units, length]     = *encode(codepoint.value_or(REPLACEMENT));
-            auto       [units_it, new_out] = std::ranges::copy(units.begin(), out);
+            auto       [units_it, new_out] = std::ranges::copy(units, out);
 
             it  = std::move(new_it);
             out = std::move(new_out);
@@ -73,9 +61,23 @@ namespace utf8 {
         return out;
     }
 
-    template<std::ranges::input_range R, std::output_iterator<char8_t> O>
-        requires std::same_as<std::ranges::range_value_t<R>, char8_t>
-    constexpr auto repair(R&& range, O out) noexcept -> O {
-        return repair(std::ranges::begin(range), std::ranges::end(range), std::move(out));
+    namespace ranges {
+        template<std::ranges::input_range R>
+            requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+        [[nodiscard]] constexpr auto is_valid(R&& range) noexcept -> bool {
+            return utf8::is_valid(std::ranges::begin(range), std::ranges::end(range));
+        }
+
+        template<std::ranges::input_range R>
+            requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+        [[nodiscard]] constexpr auto length(R&& range) noexcept -> Expected<std::size_t> {
+            return utf8::length(std::ranges::begin(range), std::ranges::end(range));
+        }
+
+        template<std::ranges::input_range R, std::output_iterator<char8_t> O>
+            requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+        constexpr auto repair(R&& range, O out) noexcept -> O {
+            return utf8::repair(std::ranges::begin(range), std::ranges::end(range), std::move(out));
+        }
     }
 }

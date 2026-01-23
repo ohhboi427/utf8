@@ -2,9 +2,7 @@
 
 #include "validation.hpp"
 
-#include <concepts>
 #include <iterator>
-#include <ranges>
 #include <type_traits>
 #include <utility>
 
@@ -97,39 +95,4 @@ namespace utf8 {
             m_codepoint = codepoint.value_or(REPLACEMENT);
         }
     };
-
-    template<std::ranges::view V>
-        requires std::same_as<std::ranges::range_value_t<V>, char8_t>
-    class View : public std::ranges::view_interface<View<V>> {
-    public:
-        View() = default;
-
-        explicit constexpr View(V view) noexcept
-            : m_view{ std::move(view) } {}
-
-        [[nodiscard]] constexpr auto begin(this auto&& self) noexcept {
-            return Iterator{ std::ranges::begin(self.m_view), std::ranges::end(self.m_view) };
-        }
-
-        [[nodiscard]] static constexpr auto end() noexcept {
-            return std::default_sentinel_t{};
-        }
-
-    private:
-        V m_view{};
-    };
-
-    template<std::ranges::viewable_range R>
-        requires std::same_as<std::ranges::range_value_t<R>, char8_t>
-    View(R&&) -> View<std::views::all_t<R>>;
-
-    struct AsUtf8Fn : std::ranges::range_adaptor_closure<AsUtf8Fn> {
-        template<std::ranges::viewable_range R>
-            requires std::same_as<std::ranges::range_value_t<R>, char8_t>
-        [[nodiscard]] static constexpr auto operator()(R&& range) noexcept {
-            return View{ std::forward<R>(range) };
-        }
-    };
-
-    inline constexpr AsUtf8Fn as_utf8{};
 }

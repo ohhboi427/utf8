@@ -12,6 +12,7 @@ target_sources(utf8
     "../include/utf8/algorithm.hpp"
     "../include/utf8/error.hpp"
     "../include/utf8/iterator.hpp"
+    "../include/utf8/ranges.hpp"
     "../include/utf8/validation.hpp"
 )
 
