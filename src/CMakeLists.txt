@@ -9,7 +9,9 @@ target_sources(utf8
     BASE_DIRS "../include"
     FILES
     "../include/utf8/utf8.hpp"
+    "../include/utf8/algorithm.hpp"
     "../include/utf8/error.hpp"
+    "../include/utf8/iterator.hpp"
     "../include/utf8/validation.hpp"
 )
 

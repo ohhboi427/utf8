@@ -7,7 +7,6 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <expected>
 #include <iterator>
 #include <ranges>
 #include <utility>
@@ -50,7 +49,7 @@ namespace utf8 {
 
         const std::uint8_t length = std::countl_one(std::bit_cast<std::uint8_t>(unit));
         if(length < 2U || length > 4U) {
-            return std::unexpected{ Error::InvalidByteSequence };
+            return Unexpected{ Error::InvalidByteSequence };
         }
 
         return length;
@@ -65,7 +64,7 @@ namespace utf8 {
     ) noexcept -> Expected<std::pair<char8_t, std::uint8_t>> {
         const auto length = decoded_length(unit);
         if(!length) {
-            return std::unexpected{ length.error() };
+            return Unexpected{ length.error() };
         }
 
         return std::make_pair(unit & detail::leading_mask(*length), *length);
@@ -81,7 +80,7 @@ namespace utf8 {
 
     [[nodiscard]] constexpr auto read_continuation(const char8_t unit) noexcept -> Expected<char8_t> {
         if(!is_continuation(unit)) {
-            return std::unexpected{ Error::InvalidByteSequence };
+            return Unexpected{ Error::InvalidByteSequence };
         }
 
         return unit & detail::CONTINUATION_UNIT_MASK;
@@ -106,7 +105,7 @@ namespace utf8 {
 
     [[nodiscard]] constexpr auto encoded_length(const char32_t codepoint) noexcept -> Expected<std::uint8_t> {
         if(is_invalid(codepoint)) {
-            return std::unexpected{ Error::InvalidCodepoint };
+            return Unexpected{ Error::InvalidCodepoint };
         }
 
         for(std::uint8_t i = 0U; i < static_cast<std::uint8_t>(detail::SEQUENCE_LAST.size()); ++i) {
@@ -115,7 +114,7 @@ namespace utf8 {
             }
         }
 
-        return std::unexpected{ Error::InvalidCodepoint };
+        return Unexpected{ Error::InvalidCodepoint };
     }
 
     using Decode = char32_t;
@@ -124,14 +123,14 @@ namespace utf8 {
         requires std::same_as<std::iter_value_t<I>, char8_t>
     [[nodiscard]] constexpr auto decode(I it, S end) noexcept -> std::pair<I, Expected<Decode>> {
         if(it == end) {
-            return { std::move(it), std::unexpected{ Error::InvalidByteSequence } };
+            return { std::move(it), Unexpected{ Error::InvalidByteSequence } };
         }
 
         const auto leading_length = read_leading(*it);
         std::ranges::advance(it, 1U, end);
 
         if(!leading_length) {
-            return { std::move(it), std::unexpected{ leading_length.error() } };
+            return { std::move(it), Unexpected{ leading_length.error() } };
         }
 
         const auto [leading, length] = *leading_length;
@@ -139,12 +138,12 @@ namespace utf8 {
         auto codepoint = static_cast<char32_t>(leading);
         for(std::size_t i = 1U; i < length; ++i) {
             if(it == end) {
-                return { std::move(it), std::unexpected{ Error::InvalidByteSequence } };
+                return { std::move(it), Unexpected{ Error::InvalidByteSequence } };
             }
 
             const auto continuation = read_continuation(*it);
             if(!continuation) {
-                return { std::move(it), std::unexpected{ continuation.error() } };
+                return { std::move(it), Unexpected{ continuation.error() } };
             }
 
             codepoint <<= 6U;
@@ -154,11 +153,11 @@ namespace utf8 {
         }
 
         if(is_overlong(codepoint, length)) {
-            return { std::move(it), std::unexpected{ Error::OverlongEncoding } };
+            return { std::move(it), Unexpected{ Error::OverlongEncoding } };
         }
 
         if(is_invalid(codepoint)) {
-            return { std::move(it), std::unexpected{ Error::InvalidCodepoint } };
+            return { std::move(it), Unexpected{ Error::InvalidCodepoint } };
         }
 
         return { std::move(it), codepoint };
@@ -184,7 +183,7 @@ namespace utf8 {
     [[nodiscard]] constexpr auto encode(char32_t codepoint) noexcept -> Expected<Encode> {
         const auto length = encoded_length(codepoint);
         if(!length) {
-            return std::unexpected{ length.error() };
+            return Unexpected{ length.error() };
         }
 
         Encode result{ .units = {}, .length = *length };

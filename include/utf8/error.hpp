@@ -10,5 +10,6 @@ namespace utf8 {
     };
 
     template<typename T>
-    using Expected = std::expected<T, Error>;
+    using Expected   = std::expected<T, Error>;
+    using Unexpected = std::unexpected<Error>;
 }
