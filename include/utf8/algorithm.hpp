@@ -158,7 +158,7 @@ namespace utf8 {
 
         template<std::ranges::input_range R, std::output_iterator<char32_t> O>
             requires std::same_as<std::ranges::range_value_t<R>, char8_t>
-        constexpr auto decode_strict(R&& range, O out) noexcept -> std::pair<O, Expected<void>> {
+        [[nodiscard]] constexpr auto decode_strict(R&& range, O out) noexcept -> std::pair<O, Expected<void>> {
             return utf8::decode_strict(std::ranges::begin(range), std::ranges::end(range), std::move(out));
         }
 
@@ -170,7 +170,7 @@ namespace utf8 {
 
         template<std::ranges::input_range R, std::output_iterator<char8_t> O>
             requires std::same_as<std::ranges::range_value_t<R>, char32_t>
-        constexpr auto encode_strict(R&& range, O out) noexcept -> std::pair<O, Expected<void>> {
+        [[nodiscard]] constexpr auto encode_strict(R&& range, O out) noexcept -> std::pair<O, Expected<void>> {
             return utf8::encode_strict(std::ranges::begin(range), std::ranges::end(range), std::move(out));
         }
     }
