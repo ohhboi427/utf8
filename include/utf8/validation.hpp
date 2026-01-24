@@ -9,17 +9,15 @@
 #include <cstdint>
 #include <iterator>
 #include <ranges>
+#include <tuple>
 #include <utility>
 
 namespace utf8 {
-    constexpr char32_t BOM = U'\uFEFF';
-    constexpr char32_t REPLACEMENT = U'\uFFFD';
-
     namespace detail {
-        constexpr char8_t CONTINUATION_UNIT_HEADER = 0x80U;
-        constexpr char8_t CONTINUATION_UNIT_MASK   = 0x3FU;
+        inline constexpr char8_t CONTINUATION_UNIT_HEADER = 0x80U;
+        inline constexpr char8_t CONTINUATION_UNIT_MASK   = 0x3FU;
 
-        constexpr std::array SEQUENCE_LAST = {
+        inline constexpr std::array SEQUENCE_LAST = {
             U'\u007F',
             U'\u07FF',
             U'\uFFFF',
@@ -164,6 +162,61 @@ namespace utf8 {
         return { std::move(it), codepoint };
     }
 
+    template<std::input_iterator I, std::sentinel_for<I> S, std::output_iterator<char8_t> O>
+        requires std::same_as<std::iter_value_t<I>, char8_t>
+    [[nodiscard]] constexpr auto decode_into(I it, S end, O out) noexcept -> std::tuple<I, O, Expected<char32_t>> {
+        if(it == end) {
+            return { std::move(it), std::move(out), Unexpected{ Error::InvalidByteSequence } };
+        }
+
+        char8_t unit = *it;
+
+        const auto leading_length = read_leading(unit);
+
+        std::ranges::advance(it, 1U, end);
+
+        *out = unit;
+        ++out;
+
+        if(!leading_length) {
+            return { std::move(it), std::move(out), Unexpected{ leading_length.error() } };
+        }
+
+        const auto [leading, length] = *leading_length;
+
+        auto codepoint = static_cast<char32_t>(leading);
+        for(std::size_t i = 1U; i < length; ++i) {
+            if(it == end) {
+                return { std::move(it), std::move(out), Unexpected{ Error::InvalidByteSequence } };
+            }
+
+            unit = *it;
+
+            const auto continuation = read_continuation(unit);
+            if(!continuation) {
+                return { std::move(it), std::move(out), Unexpected{ continuation.error() } };
+            }
+
+            codepoint <<= 6U;
+            codepoint |= static_cast<char32_t>(*continuation);
+
+            std::ranges::advance(it, 1U, end);
+
+            *out = unit;
+            ++out;
+        }
+
+        if(is_overlong(codepoint, length)) {
+            return { std::move(it), std::move(out), Unexpected{ Error::OverlongEncoding } };
+        }
+
+        if(is_invalid(codepoint)) {
+            return { std::move(it), std::move(out), Unexpected{ Error::InvalidCodepoint } };
+        }
+
+        return { std::move(it), std::move(out), codepoint };
+    }
+
     struct Encode {
         std::array<char8_t, 4U> units;
         std::uint8_t            length;
@@ -205,4 +258,10 @@ namespace utf8 {
 
         return result;
     }
+
+    inline constexpr char32_t BOM         = U'\uFEFF';
+    inline constexpr char32_t REPLACEMENT = U'\uFFFD';
+
+    inline constexpr auto BOM_UNITS         = *encode(BOM);
+    inline constexpr auto REPLACEMENT_UNITS = *encode(REPLACEMENT);
 }

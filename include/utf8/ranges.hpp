@@ -49,6 +49,48 @@ namespace utf8::ranges {
         }
     };
 
+    template<std::ranges::view V>
+        requires std::same_as<std::ranges::range_value_t<V>, char8_t>
+    class SanView : public std::ranges::view_interface<View<V>> {
+    public:
+        SanView() = default;
+
+        explicit constexpr SanView(V view) noexcept
+            : m_view{ std::move(view) } {}
+
+        [[nodiscard]] constexpr V base() const & noexcept
+            requires std::copy_constructible<V> {
+            return m_view;
+        }
+
+        [[nodiscard]] constexpr auto base() && noexcept -> V {
+            return std::move(m_view);
+        }
+
+        [[nodiscard]] constexpr auto begin(this auto&& self) noexcept {
+            return SanIterator{ std::ranges::begin(self.m_view), std::ranges::end(self.m_view) };
+        }
+
+        [[nodiscard]] static constexpr auto end() noexcept {
+            return std::default_sentinel_t{};
+        }
+
+    private:
+        V m_view{};
+    };
+
+    template<std::ranges::viewable_range R>
+        requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+    SanView(R&&) -> SanView<std::views::all_t<R>>;
+
+    struct AsSan : std::ranges::range_adaptor_closure<AsSan> {
+        template<std::ranges::viewable_range R>
+            requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+        [[nodiscard]] static constexpr auto operator()(R&& range) noexcept {
+            return SanView{ std::forward<R>(range) };
+        }
+    };
+
     struct AsChars : std::ranges::range_adaptor_closure<AsChars> {
         template<std::ranges::viewable_range R>
             requires std::same_as<std::ranges::range_value_t<R>, char8_t>
@@ -75,6 +117,7 @@ namespace utf8::ranges {
 
     namespace views {
         inline constexpr AsUtf8Fn as_utf8{};
+        inline constexpr AsSan    as_san{};
 
         inline constexpr AsChars   as_chars{};
         inline constexpr AsU8Chars as_u8chars{};
