@@ -49,8 +49,35 @@ namespace utf8::ranges {
         }
     };
 
+    struct AsChars : std::ranges::range_adaptor_closure<AsChars> {
+        template<std::ranges::viewable_range R>
+            requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+        [[nodiscard]] static constexpr auto operator()(R&& range) noexcept {
+            return std::forward<R>(range) | std::views::transform(
+                [](const char8_t c) noexcept -> char {
+                    return static_cast<char>(c);
+                }
+            );
+        }
+    };
+
+    struct AsU8Chars : std::ranges::range_adaptor_closure<AsU8Chars> {
+        template<std::ranges::viewable_range R>
+            requires std::same_as<std::ranges::range_value_t<R>, char>
+        [[nodiscard]] static constexpr auto operator()(R&& range) noexcept {
+            return std::forward<R>(range) | std::views::transform(
+                [](const char c) noexcept -> char8_t {
+                    return static_cast<char8_t>(c);
+                }
+            );
+        }
+    };
+
     namespace views {
         inline constexpr AsUtf8Fn as_utf8{};
+
+        inline constexpr AsChars   as_chars{};
+        inline constexpr AsU8Chars as_u8chars{};
     }
 }
 
