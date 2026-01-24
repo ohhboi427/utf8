@@ -51,10 +51,44 @@ namespace utf8 {
         while(it != end) {
             auto [new_it, codepoint] = decode(std::move(it), end);
 
-            const auto [units, length]     = *encode(codepoint.value_or(REPLACEMENT));
+            const auto units               = *encode(codepoint.value_or(REPLACEMENT));
             auto       [units_it, new_out] = std::ranges::copy(units, out);
 
             it  = std::move(new_it);
+            out = std::move(new_out);
+        }
+
+        return out;
+    }
+
+    template<std::input_iterator I, std::sentinel_for<I> S, std::output_iterator<char32_t> O>
+        requires std::same_as<std::iter_value_t<I>, char8_t>
+    constexpr auto decode_all(I it, S end, O out) noexcept -> O {
+        while(it != end) {
+            auto [new_it, codepoint] = decode(std::move(it), end);
+
+            *out = codepoint.value_or(REPLACEMENT);
+            ++out;
+
+            it = std::move(new_it);
+        }
+
+        return out;
+    }
+
+    template<std::input_iterator I, std::sentinel_for<I> S, std::output_iterator<char8_t> O>
+        requires std::same_as<std::iter_value_t<I>, char32_t>
+    constexpr auto encode_all(I it, S end, O out) noexcept -> O {
+        while(it != end) {
+            char32_t codepoint = *it;
+            if(is_invalid(codepoint)) {
+                codepoint = REPLACEMENT;
+            }
+
+            const auto units               = *encode(codepoint);
+            auto       [units_it, new_out] = std::ranges::copy(units, out);
+
+            std::ranges::advance(it, 1U, end);
             out = std::move(new_out);
         }
 
@@ -78,6 +112,18 @@ namespace utf8 {
             requires std::same_as<std::ranges::range_value_t<R>, char8_t>
         constexpr auto repair(R&& range, O out) noexcept -> O {
             return utf8::repair(std::ranges::begin(range), std::ranges::end(range), std::move(out));
+        }
+
+        template<std::ranges::input_range R, std::output_iterator<char32_t> O>
+            requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+        constexpr auto decode_all(R&& range, O out) noexcept -> O {
+            return utf8::decode_all(std::ranges::begin(range), std::ranges::end(range), std::move(out));
+        }
+
+        template<std::ranges::input_range R, std::output_iterator<char8_t> O>
+            requires std::same_as<std::ranges::range_value_t<R>, char32_t>
+        constexpr auto encode_all(R&& range, O out) noexcept -> O {
+            return utf8::encode_all(std::ranges::begin(range), std::ranges::end(range), std::move(out));
         }
     }
 }
