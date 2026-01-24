@@ -51,11 +51,11 @@ namespace utf8 {
         while(it != end) {
             auto [new_it, codepoint] = decode(std::move(it), end);
 
-            const auto units               = *encode(codepoint.value_or(REPLACEMENT));
-            auto       [units_it, new_out] = std::ranges::copy(units, out);
+            const auto units = *encode(codepoint.value_or(REPLACEMENT));
 
-            it  = std::move(new_it);
-            out = std::move(new_out);
+            out = std::ranges::copy(units, std::move(out)).out;
+
+            it = std::move(new_it);
         }
 
         return out;
@@ -103,11 +103,11 @@ namespace utf8 {
                 codepoint = REPLACEMENT;
             }
 
-            const auto units               = *encode(codepoint);
-            auto       [units_it, new_out] = std::ranges::copy(units, out);
+            const auto units = *encode(codepoint);
+
+            out = std::ranges::copy(units, std::move(out)).out;
 
             std::ranges::advance(it, 1U, end);
-            out = std::move(new_out);
         }
 
         return out;
@@ -122,10 +122,9 @@ namespace utf8 {
                 return { std::move(out), Unexpected{ units.error() } };
             }
 
-            auto [units_it, new_out] = std::ranges::copy(*units, out);
+            out = std::ranges::copy(*units, std::move(out)).out;
 
             std::ranges::advance(it, 1U, end);
-            out = std::move(new_out);
         }
 
         return { std::move(out), {} };

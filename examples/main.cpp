@@ -7,7 +7,7 @@
 using namespace std::string_view_literals;
 
 auto main() -> int {
-    constexpr auto str = u8"Helló Világ!"sv;
+    constexpr auto str = u8"Helló, Világ!"sv;
 
     if(const auto length = utf8::ranges::length(str); length) {
         std::println("{}", length.value());
