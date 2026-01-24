@@ -29,6 +29,10 @@ namespace utf8 {
         explicit constexpr Iterator(I it, S end) noexcept
             : m_it{ std::move(it) }, m_end{ std::move(end) } {
             next();
+
+            if(m_codepoint == BOM) {
+                next();
+            }
         }
 
         [[nodiscard]] constexpr auto operator*() const noexcept -> reference {

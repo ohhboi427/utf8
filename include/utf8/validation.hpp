@@ -12,6 +12,7 @@
 #include <utility>
 
 namespace utf8 {
+    constexpr char32_t BOM = U'\uFEFF';
     constexpr char32_t REPLACEMENT = U'\uFFFD';
 
     namespace detail {
