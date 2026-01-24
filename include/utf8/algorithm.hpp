@@ -76,6 +76,24 @@ namespace utf8 {
         return out;
     }
 
+    template<std::input_iterator I, std::sentinel_for<I> S, std::output_iterator<char32_t> O>
+        requires std::same_as<std::iter_value_t<I>, char8_t>
+    [[nodiscard]] constexpr auto decode_strict(I it, S end, O out) noexcept -> std::pair<O, Expected<void>> {
+        while(it != end) {
+            auto [new_it, codepoint] = decode(std::move(it), end);
+            if(!codepoint) {
+                return { std::move(out), Unexpected{ codepoint.error() } };
+            }
+
+            *out = *codepoint;
+            ++out;
+
+            it = std::move(new_it);
+        }
+
+        return { std::move(out), {} };
+    }
+
     template<std::input_iterator I, std::sentinel_for<I> S, std::output_iterator<char8_t> O>
         requires std::same_as<std::iter_value_t<I>, char32_t>
     constexpr auto encode_all(I it, S end, O out) noexcept -> O {
@@ -93,6 +111,24 @@ namespace utf8 {
         }
 
         return out;
+    }
+
+    template<std::input_iterator I, std::sentinel_for<I> S, std::output_iterator<char8_t> O>
+        requires std::same_as<std::iter_value_t<I>, char32_t>
+    [[nodiscard]] constexpr auto encode_strict(I it, S end, O out) noexcept -> std::pair<O, Expected<void>> {
+        while(it != end) {
+            const auto units = encode(*it);
+            if(!units) {
+                return { std::move(out), Unexpected{ units.error() } };
+            }
+
+            auto [units_it, new_out] = std::ranges::copy(*units, out);
+
+            std::ranges::advance(it, 1U, end);
+            out = std::move(new_out);
+        }
+
+        return { std::move(out), {} };
     }
 
     namespace ranges {
@@ -120,10 +156,22 @@ namespace utf8 {
             return utf8::decode_all(std::ranges::begin(range), std::ranges::end(range), std::move(out));
         }
 
+        template<std::ranges::input_range R, std::output_iterator<char32_t> O>
+            requires std::same_as<std::ranges::range_value_t<R>, char8_t>
+        constexpr auto decode_strict(R&& range, O out) noexcept -> std::pair<O, Expected<void>> {
+            return utf8::decode_strict(std::ranges::begin(range), std::ranges::end(range), std::move(out));
+        }
+
         template<std::ranges::input_range R, std::output_iterator<char8_t> O>
             requires std::same_as<std::ranges::range_value_t<R>, char32_t>
         constexpr auto encode_all(R&& range, O out) noexcept -> O {
             return utf8::encode_all(std::ranges::begin(range), std::ranges::end(range), std::move(out));
+        }
+
+        template<std::ranges::input_range R, std::output_iterator<char8_t> O>
+            requires std::same_as<std::ranges::range_value_t<R>, char32_t>
+        constexpr auto encode_strict(R&& range, O out) noexcept -> std::pair<O, Expected<void>> {
+            return utf8::encode_strict(std::ranges::begin(range), std::ranges::end(range), std::move(out));
         }
     }
 }
