@@ -169,14 +169,12 @@ namespace utf8 {
             return { std::move(it), std::move(out), Unexpected{ Error::InvalidByteSequence } };
         }
 
-        char8_t unit = *it;
+        const auto leading_length = read_leading(*it);
 
-        const auto leading_length = read_leading(unit);
+        *out = *it;
+        ++out;
 
         std::ranges::advance(it, 1U, end);
-
-        *out = unit;
-        ++out;
 
         if(!leading_length) {
             return { std::move(it), std::move(out), Unexpected{ leading_length.error() } };
@@ -190,9 +188,7 @@ namespace utf8 {
                 return { std::move(it), std::move(out), Unexpected{ Error::InvalidByteSequence } };
             }
 
-            unit = *it;
-
-            const auto continuation = read_continuation(unit);
+            const auto continuation = read_continuation(*it);
             if(!continuation) {
                 return { std::move(it), std::move(out), Unexpected{ continuation.error() } };
             }
@@ -200,10 +196,10 @@ namespace utf8 {
             codepoint <<= 6U;
             codepoint |= static_cast<char32_t>(*continuation);
 
-            std::ranges::advance(it, 1U, end);
-
-            *out = unit;
+            *out = *it;
             ++out;
+
+            std::ranges::advance(it, 1U, end);
         }
 
         if(is_overlong(codepoint, length)) {
