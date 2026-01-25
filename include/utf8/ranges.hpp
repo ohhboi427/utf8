@@ -9,11 +9,11 @@
 namespace utf8::ranges {
     template<std::ranges::view V>
         requires std::same_as<std::ranges::range_value_t<V>, char8_t>
-    class View : public std::ranges::view_interface<View<V>> {
+    class DecodeView : public std::ranges::view_interface<DecodeView<V>> {
     public:
-        View() = default;
+        DecodeView() = default;
 
-        explicit constexpr View(V view) noexcept
+        explicit constexpr DecodeView(V view) noexcept
             : m_view{ std::move(view) } {}
 
         [[nodiscard]] constexpr V base() const & noexcept
@@ -39,23 +39,23 @@ namespace utf8::ranges {
 
     template<std::ranges::viewable_range R>
         requires std::same_as<std::ranges::range_value_t<R>, char8_t>
-    View(R&&) -> View<std::views::all_t<R>>;
+    DecodeView(R&&) -> DecodeView<std::views::all_t<R>>;
 
-    struct AsUtf8Fn : std::ranges::range_adaptor_closure<AsUtf8Fn> {
+    struct Decode : std::ranges::range_adaptor_closure<Decode> {
         template<std::ranges::viewable_range R>
             requires std::same_as<std::ranges::range_value_t<R>, char8_t>
         [[nodiscard]] static constexpr auto operator()(R&& range) noexcept {
-            return View{ std::forward<R>(range) };
+            return DecodeView{ std::forward<R>(range) };
         }
     };
 
     template<std::ranges::view V>
         requires std::same_as<std::ranges::range_value_t<V>, char8_t>
-    class SanView : public std::ranges::view_interface<View<V>> {
+    class SanitizeView : public std::ranges::view_interface<DecodeView<V>> {
     public:
-        SanView() = default;
+        SanitizeView() = default;
 
-        explicit constexpr SanView(V view) noexcept
+        explicit constexpr SanitizeView(V view) noexcept
             : m_view{ std::move(view) } {}
 
         [[nodiscard]] constexpr V base() const & noexcept
@@ -81,13 +81,13 @@ namespace utf8::ranges {
 
     template<std::ranges::viewable_range R>
         requires std::same_as<std::ranges::range_value_t<R>, char8_t>
-    SanView(R&&) -> SanView<std::views::all_t<R>>;
+    SanitizeView(R&&) -> SanitizeView<std::views::all_t<R>>;
 
-    struct AsSan : std::ranges::range_adaptor_closure<AsSan> {
+    struct Sanitize : std::ranges::range_adaptor_closure<Sanitize> {
         template<std::ranges::viewable_range R>
             requires std::same_as<std::ranges::range_value_t<R>, char8_t>
         [[nodiscard]] static constexpr auto operator()(R&& range) noexcept {
-            return SanView{ std::forward<R>(range) };
+            return SanitizeView{ std::forward<R>(range) };
         }
     };
 
@@ -116,8 +116,8 @@ namespace utf8::ranges {
     };
 
     namespace views {
-        inline constexpr AsUtf8Fn as_utf8{};
-        inline constexpr AsSan    as_san{};
+        inline constexpr Decode   decode{};
+        inline constexpr Sanitize sanitize{};
 
         inline constexpr AsChars   as_chars{};
         inline constexpr AsU8Chars as_u8chars{};
