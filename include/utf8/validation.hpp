@@ -118,50 +118,6 @@ namespace utf8 {
 
     using Decode = char32_t;
 
-    template<std::input_iterator I, std::sentinel_for<I> S>
-        requires std::same_as<std::iter_value_t<I>, char8_t>
-    [[nodiscard]] constexpr auto decode(I it, S end) noexcept -> std::pair<I, Expected<Decode>> {
-        if(it == end) {
-            return { std::move(it), Unexpected{ Error::InvalidByteSequence } };
-        }
-
-        const auto leading_length = read_leading(*it);
-        std::ranges::advance(it, 1U, end);
-
-        if(!leading_length) {
-            return { std::move(it), Unexpected{ leading_length.error() } };
-        }
-
-        const auto [leading, length] = *leading_length;
-
-        auto codepoint = static_cast<char32_t>(leading);
-        for(std::size_t i = 1U; i < length; ++i) {
-            if(it == end) {
-                return { std::move(it), Unexpected{ Error::InvalidByteSequence } };
-            }
-
-            const auto continuation = read_continuation(*it);
-            if(!continuation) {
-                return { std::move(it), Unexpected{ continuation.error() } };
-            }
-
-            codepoint <<= 6U;
-            codepoint |= static_cast<char32_t>(*continuation);
-
-            std::ranges::advance(it, 1U, end);
-        }
-
-        if(is_overlong(codepoint, length)) {
-            return { std::move(it), Unexpected{ Error::OverlongEncoding } };
-        }
-
-        if(is_invalid(codepoint)) {
-            return { std::move(it), Unexpected{ Error::InvalidCodepoint } };
-        }
-
-        return { std::move(it), codepoint };
-    }
-
     template<std::input_iterator I, std::sentinel_for<I> S, std::output_iterator<char8_t> O>
         requires std::same_as<std::iter_value_t<I>, char8_t>
     [[nodiscard]] constexpr auto decode_into(I it, S end, O out) noexcept -> std::tuple<I, O, Expected<char32_t>> {
@@ -211,6 +167,35 @@ namespace utf8 {
         }
 
         return { std::move(it), std::move(out), codepoint };
+    }
+
+    template<std::input_iterator I, std::sentinel_for<I> S>
+        requires std::same_as<std::iter_value_t<I>, char8_t>
+    [[nodiscard]] constexpr auto decode(I it, S end) noexcept -> std::pair<I, Expected<Decode>> {
+        struct DiscardIterator {
+            using iterator_category = std::output_iterator_tag;
+            using iterator_concept  = std::output_iterator_tag;
+            using value_type        = void;
+            using reference         = void;
+            using pointer           = void;
+            using difference_type   = std::iter_difference_t<I>;
+
+            [[nodiscard]] constexpr auto operator*() const noexcept {
+                return std::ignore;
+            }
+
+            constexpr auto operator++() noexcept -> DiscardIterator& {
+                return *this;
+            }
+
+            constexpr auto operator++(int) noexcept -> DiscardIterator {
+                return *this;
+            }
+        };
+
+        auto [new_it, new_out, codepoint] = decode_into(std::move(it), end, DiscardIterator{});
+
+        return { std::move(new_it), std::move(codepoint) };
     }
 
     struct Encode {
