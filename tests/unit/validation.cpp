@@ -3,6 +3,7 @@
 #include <utf8/error.hpp>
 #include <utf8/validation.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <ranges>
 
