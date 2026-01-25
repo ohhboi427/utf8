@@ -7,23 +7,9 @@
 #include <cstdint>
 #include <ranges>
 
-using namespace utf8;
-
-TEST(Utf8LeadingTests, leader_bits) {
-    EXPECT_EQ(detail::leading_header(1U), 0b00000000U);
-    EXPECT_EQ(detail::leading_header(2U), 0b11000000U);
-    EXPECT_EQ(detail::leading_header(3U), 0b11100000U);
-    EXPECT_EQ(detail::leading_header(4U), 0b11110000U);
-
-    EXPECT_EQ(detail::leading_mask(1U), 0b01111111U);
-    EXPECT_EQ(detail::leading_mask(2U), 0b00011111U);
-    EXPECT_EQ(detail::leading_mask(3U), 0b00001111U);
-    EXPECT_EQ(detail::leading_mask(4U), 0b00000111U);
-}
-
 TEST(Utf8LeadingTests, decoded_length_success) {
     static constexpr auto test_case = [](const char8_t unit, const std::uint8_t length) noexcept -> void {
-        const auto result = decoded_length(unit);
+        const auto result = utf8::detail::decoded_length(unit);
 
         ASSERT_TRUE(result.has_value());
         EXPECT_EQ(*result, length);
@@ -37,10 +23,10 @@ TEST(Utf8LeadingTests, decoded_length_success) {
 
 TEST(Utf8LeadingTests, decoded_length_error) {
     static constexpr auto test_case = [](const char8_t unit) noexcept -> void {
-        const auto result = decoded_length(unit);
+        const auto result = utf8::detail::decoded_length(unit);
 
         ASSERT_FALSE(result.has_value());
-        EXPECT_EQ(result.error(), Error::InvalidByteSequence);
+        EXPECT_EQ(result.error(), utf8::Error::InvalidByteSequence);
     };
 
     test_case(0b10000000U);
@@ -48,14 +34,14 @@ TEST(Utf8LeadingTests, decoded_length_error) {
 }
 
 TEST(Utf8LeadingTests, make_leading) {
-    EXPECT_EQ(make_leading(0b00000001U, 1U), 0b00000001U);
-    EXPECT_EQ(make_leading(0b11111111U, 1U), 0b01111111U);
-    EXPECT_EQ(make_leading(0b00000001U, 2U), 0b11000001U);
-    EXPECT_EQ(make_leading(0b11111111U, 2U), 0b11011111U);
-    EXPECT_EQ(make_leading(0b00000001U, 3U), 0b11100001U);
-    EXPECT_EQ(make_leading(0b11111111U, 3U), 0b11101111U);
-    EXPECT_EQ(make_leading(0b00000001U, 4U), 0b11110001U);
-    EXPECT_EQ(make_leading(0b11111111U, 4U), 0b11110111U);
+    EXPECT_EQ(utf8::detail::make_leading(0b00000001U, 1U), 0b00000001U);
+    EXPECT_EQ(utf8::detail::make_leading(0b11111111U, 1U), 0b01111111U);
+    EXPECT_EQ(utf8::detail::make_leading(0b00000001U, 2U), 0b11000001U);
+    EXPECT_EQ(utf8::detail::make_leading(0b11111111U, 2U), 0b11011111U);
+    EXPECT_EQ(utf8::detail::make_leading(0b00000001U, 3U), 0b11100001U);
+    EXPECT_EQ(utf8::detail::make_leading(0b11111111U, 3U), 0b11101111U);
+    EXPECT_EQ(utf8::detail::make_leading(0b00000001U, 4U), 0b11110001U);
+    EXPECT_EQ(utf8::detail::make_leading(0b11111111U, 4U), 0b11110111U);
 }
 
 TEST(Utf8LeadingTests, read_leading_success) {
@@ -64,7 +50,7 @@ TEST(Utf8LeadingTests, read_leading_success) {
         const char8_t      expected_unit,
         const std::uint8_t expected_length
     ) noexcept -> void {
-        const auto result = read_leading(input_unit);
+        const auto result = utf8::detail::read_leading(input_unit);
         ASSERT_TRUE(result.has_value());
 
         const auto [unit, length] = *result;
@@ -81,26 +67,18 @@ TEST(Utf8LeadingTests, read_leading_success) {
 
 TEST(Utf8LeadingTests, read_leading_error) {
     static constexpr auto test_case = [](const char8_t unit) noexcept -> void {
-        const auto result = read_leading(unit);
+        const auto result = utf8::detail::read_leading(unit);
         ASSERT_FALSE(result.has_value());
-        EXPECT_EQ(result.error(), Error::InvalidByteSequence);
+        EXPECT_EQ(result.error(), utf8::Error::InvalidByteSequence);
     };
 
     test_case(0b10000000U);
     test_case(0b11111000U);
 }
 
-TEST(Utf8ContinationTests, is_continuation) {
-    EXPECT_TRUE(is_continuation(0b10000000U));
-
-    EXPECT_FALSE(is_continuation(0b00000000U));
-    EXPECT_FALSE(is_continuation(0b01000000U));
-    EXPECT_FALSE(is_continuation(0b11000000U));
-}
-
 TEST(Utf8ContinationTests, make_continuation) {
-    EXPECT_EQ(make_continuation(0b00000000U), 0b10000000U);
-    EXPECT_EQ(make_continuation(0b11111111U), 0b10111111U);
+    EXPECT_EQ(utf8::detail::make_continuation(0b00000000U), 0b10000000U);
+    EXPECT_EQ(utf8::detail::make_continuation(0b11111111U), 0b10111111U);
 }
 
 TEST(Utf8ContinationTests, read_continuation_success) {
@@ -108,7 +86,7 @@ TEST(Utf8ContinationTests, read_continuation_success) {
         const char8_t input_unit,
         const char8_t expected_unit
     ) noexcept -> void {
-        const auto result = read_continuation(input_unit);
+        const auto result = utf8::detail::read_continuation(input_unit);
         ASSERT_TRUE(result.has_value());
 
         EXPECT_EQ(*result, expected_unit);
@@ -120,10 +98,10 @@ TEST(Utf8ContinationTests, read_continuation_success) {
 
 TEST(Utf8ContinationTests, read_continuation_error) {
     static constexpr auto test_case = [](const char8_t unit) noexcept -> void {
-        const auto result = read_continuation(unit);
+        const auto result = utf8::detail::read_continuation(unit);
         ASSERT_FALSE(result.has_value());
 
-        EXPECT_EQ(result.error(), Error::InvalidByteSequence);
+        EXPECT_EQ(result.error(), utf8::Error::InvalidByteSequence);
     };
 
     test_case(0b00000000U);
@@ -132,7 +110,7 @@ TEST(Utf8ContinationTests, read_continuation_error) {
 
 TEST(Utf8CodepointTests, encoded_length_success) {
     static constexpr auto test_case = [](const char32_t codepoint, const std::uint8_t length) noexcept -> void {
-        const auto result = encoded_length(codepoint);
+        const auto result = utf8::detail::encoded_length(codepoint);
         ASSERT_TRUE(result.has_value());
 
         EXPECT_EQ(*result, length);
@@ -145,26 +123,28 @@ TEST(Utf8CodepointTests, encoded_length_success) {
 }
 
 TEST(Utf8CodepointTests, overlong) {
-    ASSERT_FALSE(is_overlong(0x0000U, 1U));
-    ASSERT_FALSE(is_overlong(0x007FU, 1U));
+    EXPECT_TRUE(utf8::detail::is_overlong(0x007FU, 2U));
+    EXPECT_TRUE(utf8::detail::is_overlong(0x07FFU, 3U));
+    EXPECT_TRUE(utf8::detail::is_overlong(0xFFFFU, 4U));
 
-    ASSERT_TRUE(is_overlong(0x007FU, 2U));
-    ASSERT_TRUE(is_overlong(0x07FFU, 3U));
-    ASSERT_TRUE(is_overlong(0xFFFFU, 4U));
-
-    ASSERT_FALSE(is_overlong(0x007FU, 1U));
-    ASSERT_FALSE(is_overlong(0x07FFU, 2U));
-    ASSERT_FALSE(is_overlong(0xFFFFU, 3U));
-    ASSERT_FALSE(is_overlong(0x10FFFFU, 4U));
+    EXPECT_FALSE(utf8::detail::is_overlong(0x007FU, 1U));
+    EXPECT_FALSE(utf8::detail::is_overlong(0x07FFU, 2U));
+    EXPECT_FALSE(utf8::detail::is_overlong(0xFFFFU, 3U));
+    EXPECT_FALSE(utf8::detail::is_overlong(0x10FFFFU, 4U));
 }
 
 TEST(Utf8CodepointTests, out_of_range) {
-    ASSERT_TRUE(is_invalid(0xFFFFFFFFU));
+    EXPECT_TRUE(utf8::is_invalid(0xFFFFFFFFU));
+
+    EXPECT_FALSE(utf8::is_invalid(0x10FFFFU));
 }
 
 TEST(Utf8CodepointTests, surrogate) {
-    ASSERT_TRUE(is_invalid(0xD800U));
-    ASSERT_TRUE(is_invalid(0xDFFFU));
+    EXPECT_TRUE(utf8::is_invalid(0xD800U));
+    EXPECT_TRUE(utf8::is_invalid(0xDFFFU));
+
+    EXPECT_FALSE(utf8::is_invalid(0xD7FFU));
+    EXPECT_FALSE(utf8::is_invalid(0xE000U));
 }
 
 TEST(Utf8EncodingTests, decode_success) {
@@ -178,7 +158,7 @@ TEST(Utf8EncodingTests, decode_success) {
 
         std::array<char8_t, 4U> buffer{};
 
-        const auto [it, out, codepoint] = decode_into(begin, end, buffer.begin());
+        const auto [it, out, codepoint] = utf8::decode_into(begin, end, buffer.begin());
         EXPECT_EQ(std::distance(begin, it), expected_distance);
 
         ASSERT_TRUE(codepoint.has_value());
@@ -197,13 +177,13 @@ TEST(Utf8EncodingTests, decode_success) {
 TEST(Utf8EncodingTests, decode_error) {
     static constexpr auto test_case = [](
         std::ranges::input_range auto&& range,
-        const Error                     error,
+        const utf8::Error               error,
         const std::ptrdiff_t            expected_distance
     ) noexcept -> void {
         const auto begin = std::ranges::begin(range);
         const auto end   = std::ranges::end(range);
 
-        const auto [it, codepoint] = decode(begin, end);
+        const auto [it, codepoint] = utf8::decode(begin, end);
         EXPECT_EQ(std::distance(begin, it), expected_distance);
 
         ASSERT_FALSE(codepoint.has_value());
@@ -211,27 +191,27 @@ TEST(Utf8EncodingTests, decode_error) {
     };
 
     // Invalid leading
-    test_case(std::initializer_list<char8_t>{ 0xFFU }, Error::InvalidByteSequence, 1U);
-    test_case(std::initializer_list<char8_t>{ 0xF8U }, Error::InvalidByteSequence, 1U);
-    test_case(std::initializer_list<char8_t>{ 0x80U }, Error::InvalidByteSequence, 1U);
+    test_case(std::initializer_list<char8_t>{ 0xFFU }, utf8::Error::InvalidByteSequence, 1U);
+    test_case(std::initializer_list<char8_t>{ 0xF8U }, utf8::Error::InvalidByteSequence, 1U);
+    test_case(std::initializer_list<char8_t>{ 0x80U }, utf8::Error::InvalidByteSequence, 1U);
 
     // Too short
-    test_case(std::initializer_list<char8_t>{ 0xC2U }, Error::InvalidByteSequence, 1U);
-    test_case(std::initializer_list<char8_t>{ 0xE2U, 0x80U }, Error::InvalidByteSequence, 2U);
-    test_case(std::initializer_list<char8_t>{ 0xF0U, 0x80U, 0x80U }, Error::InvalidByteSequence, 3U);
+    test_case(std::initializer_list<char8_t>{ 0xC2U }, utf8::Error::InvalidByteSequence, 1U);
+    test_case(std::initializer_list<char8_t>{ 0xE2U, 0x80U }, utf8::Error::InvalidByteSequence, 2U);
+    test_case(std::initializer_list<char8_t>{ 0xF0U, 0x80U, 0x80U }, utf8::Error::InvalidByteSequence, 3U);
 
     // Invalid continuation
-    test_case(std::initializer_list<char8_t>{ 0xC2U, 0x00U }, Error::InvalidByteSequence, 1U);
-    test_case(std::initializer_list<char8_t>{ 0xE2U, 0x00U }, Error::InvalidByteSequence, 1U);
-    test_case(std::initializer_list<char8_t>{ 0xF0U, 0x00U }, Error::InvalidByteSequence, 1U);
+    test_case(std::initializer_list<char8_t>{ 0xC2U, 0x00U }, utf8::Error::InvalidByteSequence, 1U);
+    test_case(std::initializer_list<char8_t>{ 0xE2U, 0x00U }, utf8::Error::InvalidByteSequence, 1U);
+    test_case(std::initializer_list<char8_t>{ 0xF0U, 0x00U }, utf8::Error::InvalidByteSequence, 1U);
 
     // Overlong
-    test_case(std::initializer_list<char8_t>{ 0xC0U, 0xAFU }, Error::OverlongEncoding, 2U);
-    test_case(std::initializer_list<char8_t>{ 0xF0U, 0x82U, 0x82U, 0xACU }, Error::OverlongEncoding, 4U);
+    test_case(std::initializer_list<char8_t>{ 0xC0U, 0xAFU }, utf8::Error::OverlongEncoding, 2U);
+    test_case(std::initializer_list<char8_t>{ 0xF0U, 0x82U, 0x82U, 0xACU }, utf8::Error::OverlongEncoding, 4U);
 
     // Invalid codepoints
-    test_case(std::initializer_list<char8_t>{ 0xEDU, 0xA0U, 0x80U }, Error::InvalidCodepoint, 3U);
-    test_case(std::initializer_list<char8_t>{ 0xF4U, 0x90U, 0x80U, 0x80U }, Error::InvalidCodepoint, 4U);
+    test_case(std::initializer_list<char8_t>{ 0xEDU, 0xA0U, 0x80U }, utf8::Error::InvalidCodepoint, 3U);
+    test_case(std::initializer_list<char8_t>{ 0xF4U, 0x90U, 0x80U, 0x80U }, utf8::Error::InvalidCodepoint, 4U);
 }
 
 TEST(Utf8EncodingTests, encode_success) {
@@ -239,7 +219,7 @@ TEST(Utf8EncodingTests, encode_success) {
         const char32_t                  codepoint,
         std::ranges::input_range auto&& expected_units
     ) noexcept -> void {
-        const auto units = encode(codepoint);
+        const auto units = utf8::encode(codepoint);
         ASSERT_TRUE(units.has_value());
 
         auto       it  = units->begin();
@@ -265,10 +245,10 @@ TEST(Utf8EncodingTests, encode_success) {
 
 TEST(Utf8EncodingTests, encode_error) {
     static constexpr auto test_case = [](const char32_t codepoint) noexcept -> void {
-        const auto units = encode(codepoint);
+        const auto units = utf8::encode(codepoint);
         ASSERT_FALSE(units.has_value());
 
-        EXPECT_EQ(units.error(), Error::InvalidCodepoint);
+        EXPECT_EQ(units.error(), utf8::Error::InvalidCodepoint);
     };
 
     test_case(0xD800U);
