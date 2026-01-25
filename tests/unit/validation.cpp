@@ -175,11 +175,16 @@ TEST(Utf8EncodingTests, decode_success) {
         const auto begin = std::ranges::begin(range);
         const auto end   = std::ranges::end(range);
 
-        const auto [it, codepoint] = decode(begin, end);
+        std::array<char8_t, 4U> buffer{};
+
+        const auto [it, out, codepoint] = decode_into(begin, end, buffer.begin());
         EXPECT_EQ(std::distance(begin, it), expected_distance);
 
         ASSERT_TRUE(codepoint.has_value());
         EXPECT_EQ(*codepoint, expected_codepoint);
+
+        const auto [it1, it2] = std::mismatch(buffer.begin(), out, begin);
+        EXPECT_EQ(it1, out);
     };
 
     test_case(std::initializer_list<char8_t>{ 0x7FU }, 0x007FU, 1U);
