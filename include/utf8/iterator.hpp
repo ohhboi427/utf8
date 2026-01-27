@@ -190,7 +190,7 @@ namespace utf8 {
         S                       m_end{};
         std::array<char8_t, 4U> m_buffer{};
         std::size_t             m_buffer_size{};
-        std::ptrdiff_t          m_buffer_index{};
+        std::size_t             m_buffer_index{};
 
         auto next() noexcept -> void {
             if(++m_buffer_index < m_buffer_size) {
